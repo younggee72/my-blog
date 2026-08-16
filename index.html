@@ -13,6 +13,20 @@
   <button id="theme-toggle" class="theme-toggle" aria-label="다크 모드 전환">🌙</button>
 </header>
 <main class="container">
+  <section id="apps-list" class="apps-list">
+    <h2 class="section-title">미니 웹앱</h2>
+    <div class="apps-grid">
+      <a class="app-card" href="apps/2048/index.html">
+        <div class="app-card-preview">
+          <iframe src="apps/2048/index.html" tabindex="-1" aria-hidden="true" loading="lazy" scrolling="no"></iframe>
+        </div>
+        <div class="app-card-body">
+          <h3>2048</h3>
+          <p>방향키로 숫자 타일을 밀어 합치는 퍼즐 게임. 점수판과 다크모드를 지원합니다.</p>
+        </div>
+      </a>
+    </div>
+  </section>
   <section id="post-list" class="post-list">
     <p class="empty">불러오는 중...</p>
   </section>

@@ -1,0 +1,348 @@
+/* ===== CSS 변수 (라이트 모드 기본값) ===== */
+:root {
+  --bg: #faf8ef;
+  --text-color: #776e65;
+  --title-color: #776e65;
+  --card-bg: #bbada0;
+  --card-text: #eee4da;
+  --board-bg: #bbada0;
+  --tile-empty: rgba(238, 228, 218, 0.35);
+  --btn-bg: #8f7a66;
+  --btn-text: #f9f6f2;
+  --overlay-bg: rgba(238, 228, 218, 0.73);
+  --overlay-text: #776e65;
+
+  --tile-2-bg: #eee4da;
+  --tile-2-text: #776e65;
+  --tile-4-bg: #ede0c8;
+  --tile-4-text: #776e65;
+  --tile-8-bg: #f2b179;
+  --tile-8-text: #f9f6f2;
+  --tile-16-bg: #f59563;
+  --tile-16-text: #f9f6f2;
+  --tile-32-bg: #f67c5f;
+  --tile-32-text: #f9f6f2;
+  --tile-64-bg: #f65e3b;
+  --tile-64-text: #f9f6f2;
+  --tile-128-bg: #edcf72;
+  --tile-128-text: #f9f6f2;
+  --tile-256-bg: #edcc61;
+  --tile-256-text: #f9f6f2;
+  --tile-512-bg: #edc850;
+  --tile-512-text: #f9f6f2;
+  --tile-1024-bg: #edc53f;
+  --tile-1024-text: #f9f6f2;
+  --tile-2048-bg: #edc22e;
+  --tile-2048-text: #f9f6f2;
+  --tile-super-bg: #3c3a32;
+  --tile-super-text: #f9f6f2;
+}
+
+/* 다크 모드: 시스템 설정 자동 적용 (수동으로 라이트가 선택되지 않은 경우) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181f;
+    --text-color: #eee6da;
+    --title-color: #f2ece2;
+    --card-bg: #3a3a44;
+    --card-text: #eee4da;
+    --board-bg: #2c2c34;
+    --tile-empty: rgba(255, 255, 255, 0.08);
+    --btn-bg: #5c5346;
+    --btn-text: #f2ece2;
+    --overlay-bg: rgba(20, 24, 31, 0.82);
+    --overlay-text: #f2ece2;
+  }
+}
+
+/* 다크 모드: 수동 토글로 선택된 경우 */
+:root[data-theme="dark"] {
+  --bg: #14181f;
+  --text-color: #eee6da;
+  --title-color: #f2ece2;
+  --card-bg: #3a3a44;
+  --card-text: #eee4da;
+  --board-bg: #2c2c34;
+  --tile-empty: rgba(255, 255, 255, 0.08);
+  --btn-bg: #5c5346;
+  --btn-text: #f2ece2;
+  --overlay-bg: rgba(20, 24, 31, 0.82);
+  --overlay-text: #f2ece2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+    "Noto Sans KR", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 24px 12px 40px;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 480px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  font-size: clamp(2rem, 8vw, 2.75rem);
+  font-weight: 800;
+  color: var(--title-color);
+  margin: 0;
+}
+
+.scores {
+  display: flex;
+  gap: 8px;
+}
+
+.score-box {
+  background: var(--card-bg);
+  color: var(--card-text);
+  border-radius: 6px;
+  min-width: 64px;
+  padding: 6px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.score-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+.score-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.intro {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  opacity: 0.85;
+  flex: 1 1 auto;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.btn:active {
+  filter: brightness(0.95);
+}
+
+.btn-icon {
+  padding: 10px 12px;
+  font-size: 1rem;
+}
+
+.board-container {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.board {
+  position: relative;
+  width: min(90vw, 420px);
+  height: min(90vw, 420px);
+  background: var(--board-bg);
+  border-radius: 8px;
+  padding: 3vw;
+  touch-action: none;
+}
+
+@media (min-width: 467px) {
+  .board {
+    padding: 12px;
+  }
+}
+
+.grid-cells,
+.tile-layer {
+  position: absolute;
+  top: 3vw;
+  left: 3vw;
+  right: 3vw;
+  bottom: 3vw;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 2.5vw;
+}
+
+@media (min-width: 467px) {
+  .grid-cells,
+  .tile-layer {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    gap: 10px;
+  }
+}
+
+.grid-cells {
+  z-index: 1;
+}
+
+.grid-cell {
+  background: var(--tile-empty);
+  border-radius: 6px;
+}
+
+.tile-layer {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.tile {
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: clamp(1.1rem, 8vw, 2rem);
+  grid-row: var(--row);
+  grid-column: var(--col);
+  background: var(--tile-2-bg);
+  color: var(--tile-2-text);
+  animation: tile-appear 0.15s ease;
+}
+
+@keyframes tile-appear {
+  from {
+    transform: scale(0.4);
+    opacity: 0.3;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.tile-digits-4 {
+  font-size: clamp(0.95rem, 6.5vw, 1.6rem);
+}
+
+.tile-digits-5plus {
+  font-size: clamp(0.8rem, 5.5vw, 1.3rem);
+}
+
+.tile-2 { background: var(--tile-2-bg); color: var(--tile-2-text); }
+.tile-4 { background: var(--tile-4-bg); color: var(--tile-4-text); }
+.tile-8 { background: var(--tile-8-bg); color: var(--tile-8-text); }
+.tile-16 { background: var(--tile-16-bg); color: var(--tile-16-text); }
+.tile-32 { background: var(--tile-32-bg); color: var(--tile-32-text); }
+.tile-64 { background: var(--tile-64-bg); color: var(--tile-64-text); }
+.tile-128 { background: var(--tile-128-bg); color: var(--tile-128-text); }
+.tile-256 { background: var(--tile-256-bg); color: var(--tile-256-text); }
+.tile-512 { background: var(--tile-512-bg); color: var(--tile-512-text); }
+.tile-1024 { background: var(--tile-1024-bg); color: var(--tile-1024-text); }
+.tile-2048 { background: var(--tile-2048-bg); color: var(--tile-2048-text); }
+.tile-super { background: var(--tile-super-bg); color: var(--tile-super-text); }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--overlay-bg);
+  color: var(--overlay-text);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 16px;
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay-message {
+  font-size: clamp(1.3rem, 7vw, 1.8rem);
+  font-weight: 800;
+  margin: 0;
+}
+
+.overlay-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.footer-note {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+@media (max-width: 340px) {
+  .title {
+    font-size: 1.7rem;
+  }
+  .score-box {
+    min-width: 56px;
+    padding: 5px 8px;
+  }
+  .btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+}
