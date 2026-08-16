@@ -2,6 +2,13 @@
   const listEl = document.getElementById('post-list');
   if (!listEl) return;
 
+  if (window.location.protocol === 'file:') {
+    listEl.innerHTML =
+      '<p class="empty">이 페이지를 <code>file://</code>로 직접 열면 브라우저 보안 정책 때문에 글 목록을 불러올 수 없습니다.</p>' +
+      '<p class="empty">터미널에서 <code>python -m http.server</code>를 실행한 뒤 <code>http://localhost:8000</code>으로 접속해 주세요. (GitHub Pages 등으로 배포된 사이트에서는 정상 동작합니다.)</p>';
+    return;
+  }
+
   try {
     const manifestRes = await fetch('posts/manifest.json', { cache: 'no-store' });
     if (!manifestRes.ok) throw new Error('manifest fetch failed');

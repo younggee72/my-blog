@@ -7,6 +7,13 @@
   const params = new URLSearchParams(window.location.search);
   const slug = params.get('post');
 
+  if (window.location.protocol === 'file:') {
+    bodyEl.innerHTML =
+      '<p class="empty">이 페이지를 <code>file://</code>로 직접 열면 브라우저 보안 정책 때문에 글을 불러올 수 없습니다.</p>' +
+      '<p class="empty">터미널에서 <code>python -m http.server</code>를 실행한 뒤 <code>http://localhost:8000</code>으로 접속해 주세요.</p>';
+    return;
+  }
+
   if (!slug) {
     bodyEl.innerHTML = '<p class="empty">글을 찾을 수 없습니다.</p>';
     return;
