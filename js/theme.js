@@ -1,31 +1,32 @@
 (function () {
-  function getPreferredGlow() {
-    const stored = localStorage.getItem('glow');
-    return stored === 'off' ? 'off' : 'on';
+  function getPreferredTheme() {
+    const stored = localStorage.getItem('theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
-  function updateToggleIcon(glow) {
+  function updateToggleIcon(theme) {
     const btn = document.getElementById('theme-toggle');
-    if (btn) btn.textContent = glow === 'off' ? '💤' : '⚡';
+    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
   }
 
-  function applyGlow(glow) {
-    document.documentElement.classList.toggle('no-glow', glow === 'off');
-    updateToggleIcon(glow);
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    updateToggleIcon(theme);
   }
 
-  function toggleGlow() {
-    const current = document.documentElement.classList.contains('no-glow') ? 'off' : 'on';
-    const next = current === 'off' ? 'on' : 'off';
-    localStorage.setItem('glow', next);
-    applyGlow(next);
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    applyTheme(next);
   }
 
-  applyGlow(getPreferredGlow());
+  applyTheme(getPreferredTheme());
 
   document.addEventListener('DOMContentLoaded', function () {
-    updateToggleIcon(getPreferredGlow());
+    updateToggleIcon(document.documentElement.getAttribute('data-theme'));
     const btn = document.getElementById('theme-toggle');
-    if (btn) btn.addEventListener('click', toggleGlow);
+    if (btn) btn.addEventListener('click', toggleTheme);
   });
 })();
