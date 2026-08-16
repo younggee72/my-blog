@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>글 보기 - My Blog</title>
+<script src="js/theme.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="site-title" href="index.html">My Blog</a>
+  <button id="theme-toggle" class="theme-toggle" aria-label="다크 모드 전환">🌙</button>
+</header>
+<main class="container">
+  <article class="post">
+    <h1 id="post-title"></h1>
+    <time id="post-date"></time>
+    <div id="post-body" class="post-body">
+      <p class="empty">불러오는 중...</p>
+    </div>
+  </article>
+  <p><a href="index.html">&larr; 목록으로</a></p>
+</main>
+<footer class="site-footer">
+  <p>&copy; 2026 My Blog</p>
+</footer>
+<script src="js/markdown.js"></script>
+<script src="js/post.js"></script>
+</body>
+</html>
