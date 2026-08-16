@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>픽셀 아트 에디터</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>픽셀 아트 에디터</h1>
+    <button id="themeToggle" type="button" aria-pressed="false" title="다크 모드 전환">
+      <span id="themeToggleIcon" aria-hidden="true">🌙</span>
+      <span class="sr-only">다크 모드 전환</span>
+    </button>
+  </header>
+
+  <main class="app-main">
+    <section class="controls" aria-label="도구 및 팔레트">
+      <div class="control-group">
+        <h2>색상</h2>
+        <div id="palette" class="palette"></div>
+        <div class="custom-color-row">
+          <label for="customColorPicker">커스텀 색상</label>
+          <input type="color" id="customColorPicker" value="#ff0000">
+        </div>
+        <div class="current-color-row">
+          <span>현재 색상</span>
+          <div id="currentColorIndicator" class="current-color-indicator"></div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h2>도구</h2>
+        <div class="tool-buttons">
+          <button id="penTool" type="button" class="tool-btn selected" aria-pressed="true">펜</button>
+          <button id="eraserTool" type="button" class="tool-btn" aria-pressed="false">지우개</button>
+        </div>
+      </div>
+
+      <div class="control-group action-buttons">
+        <button id="clearBtn" type="button" class="action-btn">전체 지우기</button>
+        <button id="saveBtn" type="button" class="action-btn primary">PNG로 저장</button>
+      </div>
+    </section>
+
+    <section class="grid-section" aria-label="픽셀 격자">
+      <div id="pixelGrid" class="pixel-grid" role="grid" aria-label="16x16 픽셀 격자"></div>
+    </section>
+  </main>
+
+  <script src="editor.js"></script>
+</body>
+</html>
