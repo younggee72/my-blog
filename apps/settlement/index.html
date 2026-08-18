@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>현장정산서 자동화 도구</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="app-header">
+  <h1 class="app-title">현장정산서 자동화 도구</h1>
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
+</header>
+
+<main class="container">
+  <section class="guide-box" aria-label="사용법 안내">
+    <p>
+      <strong>사용법</strong> — ① 공사명과 공급가액을 입력하면 부가세·합계가 자동으로 계산됩니다.
+      ② 아래 3개의 지출 내역 표(외주·자재비 / 노무비 / 기타 협회 및 보증서)에서 "행 추가" 버튼으로 행을 만들고 값을 입력하세요.
+      ③ 하단의 정산 요약 A·B가 입력값에 맞춰 실시간으로 갱신됩니다.
+      ④ "엑셀로 내보내기" 버튼을 누르면 화면 내용을 .xlsx 파일로 저장할 수 있습니다.
+      입력한 값은 이 브라우저에만 자동 저장되며(다른 곳으로 전송되지 않음), 실제 거래 데이터가 아닌 빈 템플릿이니 자유롭게 연습해 보세요.
+    </p>
+  </section>
+
+  <section class="card" id="project-info">
+    <h2>공사 기본 정보</h2>
+    <div class="form-grid">
+      <label class="field">
+        <span class="field-label">공사명</span>
+        <input type="text" id="project-name" placeholder="예: OOO 신축공사">
+      </label>
+      <label class="field">
+        <span class="field-label">공급가액</span>
+        <input type="text" inputmode="numeric" id="project-supply" data-money="true" placeholder="0">
+      </label>
+      <div class="field derived-field">
+        <span class="field-label">부가세</span>
+        <span id="project-vat" class="derived-value">0</span>
+      </div>
+      <div class="field derived-field">
+        <span class="field-label">합계(계약금액)</span>
+        <span id="project-total" class="derived-value">0</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="table-subcontract">
+    <h2>1. 외주·자재비</h2>
+    <p class="scroll-hint">좌우로 스크롤하세요 →</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>순번</th>
+            <th>공종</th>
+            <th>발행일</th>
+            <th>거래처</th>
+            <th>사업자등록번호</th>
+            <th>공급가액</th>
+            <th>부가세</th>
+            <th>합계</th>
+            <th>전자세금계산서</th>
+            <th>결제은행</th>
+            <th>결제일</th>
+            <th>결제금액</th>
+            <th>잔액</th>
+            <th>계좌정보</th>
+            <th>연락처</th>
+            <th>비고</th>
+            <th>삭제</th>
+          </tr>
+        </thead>
+        <tbody id="subcontract-body"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5">소계</td>
+            <td id="subcontract-sum-supply" class="sum-cell">0</td>
+            <td id="subcontract-sum-vat" class="sum-cell">0</td>
+            <td id="subcontract-sum-total" class="sum-cell">0</td>
+            <td colspan="8"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button type="button" class="btn-add" data-add-row="subcontract">+ 행 추가</button>
+  </section>
+
+  <section class="card" id="table-labor">
+    <h2>2. 노무비</h2>
+    <p class="scroll-hint">좌우로 스크롤하세요 →</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>순번</th>
+            <th>발행일</th>
+            <th>인부명</th>
+            <th>항목</th>
+            <th>공급가액(일당)</th>
+            <th>원천세</th>
+            <th>합계</th>
+            <th>삭제</th>
+          </tr>
+        </thead>
+        <tbody id="labor-body"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">소계</td>
+            <td id="labor-sum-supply" class="sum-cell">0</td>
+            <td id="labor-sum-withholding" class="sum-cell">0</td>
+            <td id="labor-sum-total" class="sum-cell">0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button type="button" class="btn-add" data-add-row="labor">+ 행 추가</button>
+  </section>
+
+  <section class="card" id="table-etc">
+    <h2>3. 기타 협회 및 보증서</h2>
+    <p class="scroll-hint">좌우로 스크롤하세요 →</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>순번</th>
+            <th>발행일</th>
+            <th>거래처</th>
+            <th>항목</th>
+            <th>공급가액</th>
+            <th>부가세</th>
+            <th>합계</th>
+            <th>삭제</th>
+          </tr>
+        </thead>
+        <tbody id="etc-body"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">소계</td>
+            <td id="etc-sum-supply" class="sum-cell">0</td>
+            <td id="etc-sum-vat" class="sum-cell">0</td>
+            <td id="etc-sum-total" class="sum-cell">0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button type="button" class="btn-add" data-add-row="etc">+ 행 추가</button>
+  </section>
+
+  <section class="card" id="summary-a">
+    <h2>정산 요약 A — 세금계산서 대비 지출 비교</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>구분</th>
+            <th>공급가액</th>
+            <th>부가세</th>
+            <th>합계</th>
+          </tr>
+        </thead>
+        <tbody id="summary-a-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="summary-b">
+    <h2>정산 요약 B — 수익 정산표</h2>
+    <div class="table-scroll">
+      <table>
+        <tbody id="summary-b-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="account-info">
+    <h2>입금 계좌 정보</h2>
+    <div class="form-grid">
+      <label class="field">
+        <span class="field-label">은행명</span>
+        <input type="text" id="account-bank" placeholder="예: OO은행">
+      </label>
+      <label class="field">
+        <span class="field-label">계좌번호</span>
+        <input type="text" id="account-number" placeholder="예: 000-000000-00-000">
+      </label>
+    </div>
+  </section>
+
+  <section class="action-buttons">
+    <button type="button" id="btn-export" class="btn-primary">엑셀로 내보내기</button>
+    <button type="button" id="btn-reset" class="btn-secondary">초기화</button>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="settlement.js"></script>
+</body>
+</html>

@@ -1,0 +1,374 @@
+:root {
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-text: #1a1a1a;
+  --color-text-secondary: #595959;
+  --color-accent: #2563eb;
+  --color-border: #e5e5e5;
+  --color-code-bg: #f0f0f0;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+
+  /* 앱 전용 보조 색 (사이트 팔레트 변수를 참조해서 구성) */
+  --settlement-table-header-bg: var(--color-bg-secondary);
+  --settlement-subtotal-bg: var(--color-code-bg);
+  --settlement-danger: #dc2626;
+  --settlement-danger-bg: #fee2e2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #121212;
+    --color-bg-secondary: #1e1e1e;
+    --color-text: #e8e8e8;
+    --color-text-secondary: #a8a8a8;
+    --color-accent: #60a5fa;
+    --color-border: #333333;
+    --color-code-bg: #1e1e1e;
+    --settlement-danger: #f87171;
+    --settlement-danger-bg: #3f1d1d;
+  }
+
+  :root:not([data-theme='light']) input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.85);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #121212;
+  --color-bg-secondary: #1e1e1e;
+  --color-text: #e8e8e8;
+  --color-text-secondary: #a8a8a8;
+  --color-accent: #60a5fa;
+  --color-border: #333333;
+  --color-code-bg: #1e1e1e;
+  --settlement-danger: #f87171;
+  --settlement-danger-bg: #3f1d1d;
+}
+
+:root[data-theme='dark'] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  font-size: 15px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  min-width: 320px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  gap: 0.75rem;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.theme-toggle {
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  border-radius: 999px;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 1.05rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 4rem;
+}
+
+.guide-box {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.guide-box p {
+  margin: 0;
+}
+
+.guide-box strong {
+  color: var(--color-text);
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--color-bg);
+}
+
+.card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.9rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.field-label {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.field input {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.95rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 40px;
+  width: 100%;
+}
+
+.field input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.derived-field {
+  justify-content: center;
+}
+
+.derived-value {
+  font-weight: 600;
+  font-size: 1.05rem;
+  padding: 0.55rem 0.6rem;
+  background: var(--color-bg-secondary);
+  border-radius: 6px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.scroll-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+  font-size: 0.85rem;
+}
+
+#summary-b table {
+  min-width: 320px;
+}
+
+th, td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.5rem 0.5rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--settlement-table-header-bg);
+  color: var(--color-text);
+  font-weight: 600;
+  z-index: 1;
+}
+
+tbody td input[type="text"],
+tbody td input[type="date"] {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.4rem 0.4rem;
+  font-size: 0.85rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  width: 100%;
+  min-width: 90px;
+  min-height: 36px;
+}
+
+tbody td input[type="date"] {
+  min-width: 140px;
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 4px;
+}
+
+tbody td input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.derived-cell {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+tfoot td {
+  background: var(--settlement-subtotal-bg);
+  font-weight: 700;
+  border-top: 2px solid var(--color-border);
+}
+
+.sum-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-add {
+  margin-top: 0.75rem;
+  border: 1px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.btn-add:hover {
+  background: var(--color-bg-secondary);
+}
+
+.btn-remove-row {
+  border: 1px solid var(--settlement-danger);
+  background: transparent;
+  color: var(--settlement-danger);
+  border-radius: 4px;
+  min-width: 40px;
+  min-height: 36px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.btn-remove-row:hover {
+  background: var(--settlement-danger-bg);
+}
+
+.btn-fill-vat {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  margin-left: 0.3rem;
+  min-height: 30px;
+}
+
+.vat-cell-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+#summary-a-body td,
+#summary-b-body td {
+  white-space: normal;
+}
+
+.summary-note {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.summary-highlight td {
+  font-weight: 700;
+  background: var(--settlement-subtotal-bg);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.action-buttons button {
+  border-radius: 6px;
+  padding: 0.7rem 1.4rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.btn-primary {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn-secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons button {
+    width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
