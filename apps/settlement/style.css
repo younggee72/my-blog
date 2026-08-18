@@ -332,6 +332,80 @@ tfoot td {
   background: var(--settlement-subtotal-bg);
 }
 
+.folder-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.folder-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.folder-controls button {
+  border-radius: 6px;
+  padding: 0.55rem 1rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.folder-status {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.folder-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.folder-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.85rem;
+  background: var(--color-bg-secondary);
+}
+
+.folder-file-item span {
+  overflow-wrap: anywhere;
+}
+
+.folder-file-item button {
+  flex-shrink: 0;
+  border: 1px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
+  border-radius: 4px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.folder-file-item button:hover {
+  background: var(--color-bg);
+}
+
+.folder-empty {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  list-style: none;
+}
+
 .action-buttons {
   display: flex;
   gap: 0.75rem;
@@ -370,5 +444,19 @@ tfoot td {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .folder-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .folder-controls button {
+    width: 100%;
+  }
+
+  .folder-file-item {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

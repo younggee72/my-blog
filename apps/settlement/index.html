@@ -19,6 +19,7 @@
       ② 아래 3개의 지출 내역 표(외주·자재비 / 노무비 / 기타 협회 및 보증서)에서 "행 추가" 버튼으로 행을 만들고 값을 입력하세요.
       ③ 하단의 정산 요약 A·B가 입력값에 맞춰 실시간으로 갱신됩니다.
       ④ "엑셀로 내보내기" 버튼을 누르면 화면 내용을 .xlsx 파일로 저장할 수 있습니다.
+      ⑤ 세금계산서 등에서 뽑아낸 데이터를 정해진 형식의 JSON 파일로 갖고 있다면 "데이터 가져오기" 버튼으로, 여러 파일을 모아둔 폴더가 있다면 "데이터 폴더 연결"로 한 번에 목록을 보고 가져올 수 있습니다.
       입력한 값은 이 브라우저에만 자동 저장되며(다른 곳으로 전송되지 않음), 실제 거래 데이터가 아닌 빈 템플릿이니 자유롭게 연습해 보세요.
     </p>
   </section>
@@ -190,7 +191,25 @@
     </div>
   </section>
 
+  <section class="card" id="data-folder">
+    <h2>데이터 폴더 연결</h2>
+    <p class="folder-hint">
+      세금계산서 등에서 뽑아낸 JSON 파일들을 모아둔 폴더를 연결하면, 그 안의 파일 목록에서 골라 바로 가져올 수 있습니다.
+      "폴더 연결"은 이전에 연결했던 폴더를 그대로 이어서 쓰고(크롬/엣지는 권한만 다시 확인하면 됨), "다른 폴더 선택"을 누르면 새 폴더를 고를 수 있습니다.
+    </p>
+    <div class="folder-controls">
+      <button type="button" id="btn-connect-folder" class="btn-secondary">폴더 연결</button>
+      <button type="button" id="btn-change-folder" class="btn-secondary">다른 폴더 선택</button>
+      <button type="button" id="btn-refresh-folder" class="btn-secondary">새로고침</button>
+      <span id="folder-status" class="folder-status">연결된 폴더 없음</span>
+    </div>
+    <input type="file" id="folder-input-fallback" webkitdirectory multiple hidden>
+    <ul id="folder-file-list" class="folder-file-list"></ul>
+  </section>
+
   <section class="action-buttons">
+    <button type="button" id="btn-import" class="btn-secondary">데이터 가져오기</button>
+    <input type="file" id="import-file-input" accept="application/json,.json" hidden>
     <button type="button" id="btn-export" class="btn-primary">엑셀로 내보내기</button>
     <button type="button" id="btn-reset" class="btn-secondary">초기화</button>
   </section>

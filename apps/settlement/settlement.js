@@ -71,7 +71,6 @@
       bank: '',
       payDate: '',
       paidAmount: 0,
-      paidAmountTouched: false,
       accountInfo: '',
       contact: '',
       note: ''
@@ -465,14 +464,9 @@
     var vatCell = tr.querySelector('[data-derived="vat"]');
     var totalCell = tr.querySelector('[data-derived="total"]');
     var balanceCell = tr.querySelector('[data-derived="balance"]');
-    var paidInput = tr.querySelector('[data-field="paidAmount"]');
 
     if (vatCell) vatCell.textContent = formatNumber(vat);
     if (totalCell) totalCell.textContent = formatNumber(total);
-
-    if (paidInput && !row.paidAmountTouched && document.activeElement !== paidInput) {
-      paidInput.value = formatNumber(row.paidAmount);
-    }
 
     var balance = total - (Number(row.paidAmount) || 0);
     if (balanceCell) balanceCell.textContent = formatNumber(balance);
@@ -574,13 +568,6 @@
   function updateRowField(tableName, row, field, target) {
     if (target.dataset.money === 'true') {
       row[field] = parseNumber(target.value);
-      if (tableName === 'subcontract' && field === 'supplyAmount' && !row.paidAmountTouched) {
-        var vat = calcVat(row.supplyAmount);
-        row.paidAmount = calcTotal(row.supplyAmount, vat);
-      }
-      if (tableName === 'subcontract' && field === 'paidAmount') {
-        row.paidAmountTouched = true;
-      }
     } else if (target.type === 'checkbox') {
       row[field] = target.checked;
     } else if (tableName === 'subcontract' && field === 'bizRegNo') {
@@ -716,6 +703,319 @@
         el.value = formatNumber(parseNumber(el.value));
       }
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // 데이터 가져오기 (JSON): 세금계산서 등에서 미리 뽑아낸 데이터를 표에 채워 넣는다.
+  // 파일 형식은 레코드 배열이며, 각 레코드는 { table: "subcontract"|"labor"|"etc", ... }
+  // 형태로 어느 표에 들어갈지 지정하고, 그 표의 컬럼명과 같은 키로 값을 채운다.
+  // 부가세/합계 등 계산되는 값은 넣지 않아도 되며(넣어도 무시됨), 항상 공급가액 등
+  // 원본 입력값으로부터 다시 계산한다.
+  // ---------------------------------------------------------------------
+  function makeRowFromImport(tableName, rec) {
+    var row;
+    if (tableName === 'subcontract') {
+      row = makeSubcontractRow(state.subcontractNextId++);
+      row.workType = rec.workType || '';
+      row.issueDate = rec.issueDate || '';
+      row.vendor = rec.vendor || '';
+      row.bizRegNo = formatBizRegNo(rec.bizRegNo || '');
+      row.supplyAmount = parseNumber(rec.supplyAmount);
+      row.taxInvoiceIssued = !!rec.taxInvoiceIssued;
+      row.bank = rec.bank || '';
+      row.payDate = rec.payDate || '';
+      row.accountInfo = rec.accountInfo || '';
+      row.contact = rec.contact || '';
+      row.note = rec.note || '';
+      // 결제금액은 실제로 결제했을 때 사용자가 직접 적는 칸이므로 가져오기 시점에는
+      // 채우지 않는다(0으로 남겨 잔액=합계 전체가 미결제 상태로 표시되게 한다).
+    } else if (tableName === 'labor') {
+      row = makeLaborRow(state.laborNextId++);
+      row.issueDate = rec.issueDate || '';
+      row.workerName = rec.workerName || '';
+      row.item = rec.item || '';
+      row.supplyAmount = parseNumber(rec.supplyAmount);
+      row.withholdingTax = parseNumber(rec.withholdingTax);
+    } else if (tableName === 'etc') {
+      row = makeEtcRow(state.etcNextId++);
+      row.issueDate = rec.issueDate || '';
+      row.vendor = rec.vendor || '';
+      row.item = rec.item || '';
+      row.supplyAmount = parseNumber(rec.supplyAmount);
+      row.vat = parseNumber(rec.vat);
+    }
+    return row;
+  }
+
+  function importFromRecords(records) {
+    if (!Array.isArray(records)) {
+      alert('가져오기 파일 형식이 올바르지 않습니다 (JSON 배열이어야 합니다).');
+      return;
+    }
+    var counts = { subcontract: 0, labor: 0, etc: 0, skipped: 0 };
+    records.forEach(function (rec) {
+      var tableName = rec && rec.table;
+      if (tableName !== 'subcontract' && tableName !== 'labor' && tableName !== 'etc') {
+        counts.skipped++;
+        return;
+      }
+      var row = makeRowFromImport(tableName, rec);
+      state[tableName].push(row);
+      counts[tableName]++;
+    });
+    onStateChange();
+    var msg = '가져오기 완료 — 외주·자재비 ' + counts.subcontract + '건, 노무비 ' + counts.labor + '건, 기타 협회 및 보증서 ' + counts.etc + '건을 추가했습니다.';
+    if (counts.skipped) msg += '\n형식이 맞지 않아 건너뛴 항목: ' + counts.skipped + '건';
+    alert(msg);
+  }
+
+  function bindImport() {
+    var btn = document.getElementById('btn-import');
+    var fileInput = document.getElementById('import-file-input');
+    if (!btn || !fileInput) return;
+
+    btn.addEventListener('click', function () { fileInput.click(); });
+
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function () {
+        var records;
+        try {
+          records = JSON.parse(reader.result);
+        } catch (e) {
+          alert('JSON 파일을 읽는 데 실패했습니다. 파일 형식을 확인해주세요.');
+          return;
+        }
+        importFromRecords(records);
+      };
+      reader.onerror = function () {
+        alert('파일을 읽는 데 실패했습니다.');
+      };
+      reader.readAsText(file, 'utf-8');
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // 데이터 폴더 연결
+  //
+  // 크롬/엣지 등 File System Access API를 지원하는 브라우저에서는 폴더를 통째로
+  // 연결해 그 안의 .json 파일 목록을 보여주고 골라서 가져올 수 있다. 연결한
+  // 폴더 핸들은 IndexedDB에 저장해두어, 다음에 열었을 때 폴더를 다시 찾아 헤맬
+  // 필요 없이 "다시 연결" 버튼(권한 재확인)만으로 이어서 쓸 수 있게 한다.
+  // 이 API를 지원하지 않는 브라우저(파이어폭스/사파리 등)에서는 폴더 선택
+  // input(webkitdirectory)으로 대체한다 — 이 경우 폴더 핸들을 저장할 수 없어
+  // 열 때마다 다시 선택해야 한다.
+  // ---------------------------------------------------------------------
+  var FOLDER_DB_NAME = 'settlement-app-db';
+  var FOLDER_DB_STORE = 'handles';
+  var FOLDER_DB_KEY = 'dataFolder';
+  var connectedDirHandle = null;
+
+  function supportsFsAccess() {
+    return typeof window.showDirectoryPicker === 'function';
+  }
+
+  function openFolderDb() {
+    return new Promise(function (resolve, reject) {
+      var req = indexedDB.open(FOLDER_DB_NAME, 1);
+      req.onupgradeneeded = function () {
+        req.result.createObjectStore(FOLDER_DB_STORE);
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+
+  function saveFolderHandle(handle) {
+    return openFolderDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(FOLDER_DB_STORE, 'readwrite');
+        tx.objectStore(FOLDER_DB_STORE).put(handle, FOLDER_DB_KEY);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  function loadFolderHandle() {
+    return openFolderDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(FOLDER_DB_STORE, 'readonly');
+        var req = tx.objectStore(FOLDER_DB_STORE).get(FOLDER_DB_KEY);
+        req.onsuccess = function () { resolve(req.result || null); };
+        req.onerror = function () { reject(req.error); };
+      });
+    });
+  }
+
+  function setFolderStatus(text) {
+    var el = document.getElementById('folder-status');
+    if (el) el.textContent = text;
+  }
+
+  function renderFolderFileList(items) {
+    var ul = document.getElementById('folder-file-list');
+    if (!ul) return;
+    ul.innerHTML = '';
+    if (!items.length) {
+      var empty = document.createElement('li');
+      empty.className = 'folder-empty';
+      empty.textContent = '폴더에서 .json 파일을 찾지 못했습니다.';
+      ul.appendChild(empty);
+      return;
+    }
+    items.forEach(function (item) {
+      var li = document.createElement('li');
+      li.className = 'folder-file-item';
+
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = item.name;
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '가져오기';
+      btn.addEventListener('click', function () {
+        item.read().then(function (text) {
+          var records;
+          try {
+            records = JSON.parse(text);
+          } catch (e) {
+            alert('"' + item.name + '" 파일을 읽는 데 실패했습니다 (JSON 형식 오류).');
+            return;
+          }
+          importFromRecords(records);
+        }).catch(function (err) {
+          alert('"' + item.name + '" 파일을 읽는 데 실패했습니다: ' + (err && err.message ? err.message : err));
+        });
+      });
+
+      li.appendChild(nameSpan);
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+  }
+
+  async function scanDirHandle(dirHandle) {
+    var entries = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file' && /\.json$/i.test(entry.name)) {
+        entries.push(entry);
+      }
+    }
+    entries.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    return entries.map(function (entry) {
+      return {
+        name: entry.name,
+        read: function () {
+          return entry.getFile().then(function (file) { return file.text(); });
+        }
+      };
+    });
+  }
+
+  function onFolderError(err) {
+    if (err && err.name === 'AbortError') return; // 사용자가 폴더 선택을 취소함
+    if (err && err.name === 'PermissionDenied') {
+      alert('폴더 접근 권한이 거부되었습니다.');
+      return;
+    }
+    alert('폴더를 여는 데 실패했습니다: ' + (err && err.message ? err.message : err));
+  }
+
+  function useDirHandle(dirHandle) {
+    connectedDirHandle = dirHandle;
+    setFolderStatus('연결됨: ' + dirHandle.name);
+    saveFolderHandle(dirHandle).catch(function () { /* 저장 실패해도 이번 세션은 계속 사용 가능 */ });
+    return scanDirHandle(dirHandle).then(renderFolderFileList);
+  }
+
+  // "폴더 연결": 이전에 연결한 폴더가 있으면 그 폴더의 권한만 다시 확인해서 이어서
+  // 쓴다(브라우저가 폴더 선택 창을 다시 띄우지 않음). 처음 연결하는 경우에만 폴더
+  // 선택 창이 뜬다.
+  function connectFolder() {
+    if (!supportsFsAccess()) {
+      var fallbackInput = document.getElementById('folder-input-fallback');
+      if (fallbackInput) fallbackInput.click();
+      return;
+    }
+
+    var request = connectedDirHandle
+      ? connectedDirHandle.requestPermission({ mode: 'read' }).then(function (perm) {
+          if (perm !== 'granted') throw { name: 'PermissionDenied' };
+          return connectedDirHandle;
+        })
+      : window.showDirectoryPicker({ mode: 'read' });
+
+    Promise.resolve(request).then(useDirHandle).catch(onFolderError);
+  }
+
+  // "다른 폴더 선택": 이미 연결된 폴더가 있어도 항상 새 폴더 선택 창을 띄운다.
+  function pickNewFolder() {
+    if (!supportsFsAccess()) {
+      var fallbackInput = document.getElementById('folder-input-fallback');
+      if (fallbackInput) fallbackInput.click();
+      return;
+    }
+    window.showDirectoryPicker({ mode: 'read' }).then(useDirHandle).catch(onFolderError);
+  }
+
+  function refreshFolder() {
+    if (supportsFsAccess() && connectedDirHandle) {
+      scanDirHandle(connectedDirHandle).then(renderFolderFileList).catch(function (err) {
+        alert('폴더를 다시 읽는 데 실패했습니다: ' + (err && err.message ? err.message : err));
+      });
+    } else {
+      connectFolder();
+    }
+  }
+
+  function bindFolderFallbackInput() {
+    var input = document.getElementById('folder-input-fallback');
+    if (!input) return;
+    input.addEventListener('change', function () {
+      var files = Array.prototype.slice.call(input.files).filter(function (f) {
+        return /\.json$/i.test(f.name);
+      });
+      if (!input.files.length) return;
+      var folderName = input.files[0].webkitRelativePath
+        ? input.files[0].webkitRelativePath.split('/')[0]
+        : '선택한 폴더';
+      setFolderStatus('연결됨: ' + folderName + ' (이 브라우저는 폴더를 기억하지 못해 다음에 열 때 다시 선택해야 합니다)');
+      var items = files.map(function (f) {
+        return { name: f.name, read: function () { return f.text(); } };
+      });
+      renderFolderFileList(items);
+      input.value = '';
+    });
+  }
+
+  function bindFolderButtons() {
+    var connectBtn = document.getElementById('btn-connect-folder');
+    var changeBtn = document.getElementById('btn-change-folder');
+    var refreshBtn = document.getElementById('btn-refresh-folder');
+    if (connectBtn) connectBtn.addEventListener('click', connectFolder);
+    if (changeBtn) changeBtn.addEventListener('click', pickNewFolder);
+    if (refreshBtn) refreshBtn.addEventListener('click', refreshFolder);
+    bindFolderFallbackInput();
+  }
+
+  function tryReconnectFolder() {
+    if (!supportsFsAccess()) return;
+    loadFolderHandle().then(function (handle) {
+      if (!handle) return;
+      return handle.queryPermission({ mode: 'read' }).then(function (perm) {
+        connectedDirHandle = handle;
+        if (perm === 'granted') {
+          setFolderStatus('연결됨: ' + handle.name);
+          return scanDirHandle(handle).then(renderFolderFileList);
+        }
+        setFolderStatus('이전에 연결한 폴더: ' + handle.name + ' (다시 연결하려면 "폴더 연결" 버튼을 눌러주세요)');
+      });
+    }).catch(function () { /* 저장된 연결 정보가 없거나 접근할 수 없음 - 무시 */ });
   }
 
   function bindActionButtons() {
@@ -938,10 +1238,16 @@
     bindTableEvents('labor-body', 'labor');
     bindTableEvents('etc-body', 'etc');
     bindActionButtons();
+    bindImport();
+    bindFolderButtons();
     bindMoneyFormatting();
     bindDatePickers();
 
     updateThemeToggleIcon(document.documentElement.getAttribute('data-theme'));
+    if (!supportsFsAccess()) {
+      setFolderStatus('이 브라우저는 폴더 연결을 지원하지 않아 "폴더 연결" 버튼이 폴더 선택 창으로 대체됩니다.');
+    }
+    tryReconnectFolder();
 
     renderAll();
   });
