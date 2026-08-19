@@ -12,6 +12,11 @@
   <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
 </header>
 
+<nav class="app-tabs" aria-label="화면 전환">
+  <a href="index.html" class="app-tab is-active" aria-current="page">정산서 작성</a>
+  <a href="invoices.html" class="app-tab">계산서함</a>
+</nav>
+
 <main class="container">
   <section class="guide-box" aria-label="사용법 안내">
     <p>
@@ -43,6 +48,12 @@
         <span class="field-label">합계(계약금액)</span>
         <span id="project-total" class="derived-value">0</span>
       </div>
+      <label class="field">
+        <span class="field-label">저장된 정산서 불러오기</span>
+        <select id="project-picker">
+          <option value="">불러올 정산서 선택…</option>
+        </select>
+      </label>
     </div>
   </section>
 
@@ -216,6 +227,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="settlement.js"></script>
+<script src="shared-utils.js?v=6"></script>
+<script src="settlement.js?v=6"></script>
 </body>
 </html>

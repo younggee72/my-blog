@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>계산서함 — 현장정산서 자동화 도구</title>
+<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="invoices.css?v=2">
+</head>
+<body>
+<header class="app-header">
+  <h1 class="app-title">계산서함</h1>
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
+</header>
+
+<nav class="app-tabs" aria-label="화면 전환">
+  <a href="index.html" class="app-tab">정산서 작성</a>
+  <a href="invoices.html" class="app-tab is-active" aria-current="page">계산서함</a>
+</nav>
+
+<main class="container">
+  <section class="guide-box" aria-label="사용법 안내">
+    <p>
+      <strong>사용법</strong> —
+      ① 계산서 PDF/이미지를 업로드하거나 폴더를 연결하면 자동으로 정보를 읽어옵니다.
+      ② "확인 필요" 배지가 붙은 항목은 반드시 클릭해서 값을 확인·수정해주세요(자동인식은 완벽하지 않습니다).
+      ③ 공사명은 자동으로 채워지지 않으니 직접 입력하세요.
+      ④ 같은 공사명끼리 모은 뒤 "이 공사명으로 정산서 생성" 버튼을 누르면 정산서 작성 화면에 협력업체 내역으로 자동 반영됩니다(결제금액은 항상 0에서 시작하며, 실제 지급을 확인하며 직접 입력해야 합니다).
+      입력한 값과 업로드한 파일은 이 브라우저에만 저장되며(다른 곳으로 전송되지 않음), 실제 거래 데이터가 아닌 빈 템플릿이니 자유롭게 연습해 보세요.
+    </p>
+  </section>
+
+  <section class="card" id="upload-card">
+    <h2>계산서 업로드</h2>
+    <p class="folder-hint">
+      PDF(전자세금계산서) 또는 스캔본·스크린샷 이미지를 올리면 자동으로 발행일·거래처·사업자등록번호·공급가액·부가세·합계를 읽어옵니다.
+      스캔 이미지나 임베드 텍스트가 없는 PDF는 인식(OCR)에 다소 시간이 걸릴 수 있습니다(처음 사용 시 한글 인식 데이터를 내려받습니다).
+    </p>
+    <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="계산서 파일을 여기로 끌어다 놓거나 클릭해서 선택">
+      <p class="dropzone-text">여기로 파일을 끌어다 놓으세요</p>
+      <button type="button" id="btn-pick-files" class="btn-primary">파일 선택</button>
+      <input type="file" id="file-input" accept=".pdf,image/*" multiple hidden>
+    </div>
+    <p id="upload-progress" class="upload-progress" aria-live="polite"></p>
+  </section>
+
+  <section class="card" id="data-folder">
+    <h2>계산서 폴더 연결</h2>
+    <p class="folder-hint">
+      세금계산서 PDF/이미지를 모아둔 폴더를 연결하면, 폴더 안의 파일을 자동으로 목록에 불러와 인식합니다.
+      "폴더 연결"은 이전에 연결했던 폴더를 그대로 이어서 쓰고(크롬/엣지는 권한만 다시 확인하면 됨), "다른 폴더 선택"을 누르면 새 폴더를 고를 수 있습니다.
+      새로고침 후 다시 연결하면 이미 목록에 있는 파일은 건너뛰고 새로 추가된 파일만 처리합니다.
+    </p>
+    <div class="folder-controls">
+      <button type="button" id="btn-connect-folder" class="btn-secondary">폴더 연결</button>
+      <button type="button" id="btn-change-folder" class="btn-secondary">다른 폴더 선택</button>
+      <button type="button" id="btn-refresh-folder" class="btn-secondary">새로고침</button>
+      <span id="folder-status" class="folder-status">연결된 폴더 없음</span>
+    </div>
+    <input type="file" id="folder-input-fallback" webkitdirectory multiple hidden>
+  </section>
+
+  <section class="card" id="invoice-list-card">
+    <h2>계산서 목록</h2>
+    <div class="filter-bar">
+      <label class="field filter-field">
+        <span class="field-label">공사명 필터</span>
+        <select id="project-filter">
+          <option value="">전체</option>
+        </select>
+      </label>
+    </div>
+    <p class="scroll-hint">좌우로 스크롤하세요 →</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>순번</th>
+            <th>발행일</th>
+            <th>거래처</th>
+            <th>공종</th>
+            <th>사업자등록번호</th>
+            <th>공급가액</th>
+            <th>부가세</th>
+            <th>합계</th>
+            <th>공사명</th>
+            <th>상태</th>
+            <th>원본</th>
+            <th>삭제</th>
+          </tr>
+        </thead>
+        <tbody id="invoice-body"></tbody>
+      </table>
+    </div>
+    <datalist id="project-suggestions"></datalist>
+  </section>
+
+  <section class="card" id="generate-card">
+    <h2>공사명별 정산서 생성</h2>
+    <p class="folder-hint">위 필터에서 공사명을 하나 고르면, 그 공사명의 계산서 합계 요약과 "정산서 생성" 버튼이 여기 나타납니다.</p>
+    <div id="generate-summary" class="generate-summary" hidden>
+      <div class="generate-summary-grid">
+        <div class="generate-summary-item">
+          <span class="field-label">건수</span>
+          <span id="gen-count" class="derived-value">0</span>
+        </div>
+        <div class="generate-summary-item">
+          <span class="field-label">공급가액 합계</span>
+          <span id="gen-supply" class="derived-value">0</span>
+        </div>
+        <div class="generate-summary-item">
+          <span class="field-label">부가세 합계</span>
+          <span id="gen-vat" class="derived-value">0</span>
+        </div>
+        <div class="generate-summary-item">
+          <span class="field-label">합계</span>
+          <span id="gen-total" class="derived-value">0</span>
+        </div>
+      </div>
+      <button type="button" id="btn-generate" class="btn-primary">이 공사명으로 정산서 생성</button>
+      <p id="generate-result" class="generate-result" aria-live="polite"></p>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="shared-utils.js?v=6"></script>
+<script src="invoices.js?v=11" type="module"></script>
+</body>
+</html>

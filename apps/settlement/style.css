@@ -13,6 +13,8 @@
   --settlement-subtotal-bg: var(--color-code-bg);
   --settlement-danger: #dc2626;
   --settlement-danger-bg: #fee2e2;
+  --settlement-warning: #b45309;
+  --settlement-warning-bg: #fef3c7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -26,6 +28,8 @@
     --color-code-bg: #1e1e1e;
     --settlement-danger: #f87171;
     --settlement-danger-bg: #3f1d1d;
+    --settlement-warning: #fbbf24;
+    --settlement-warning-bg: #423107;
   }
 
   :root:not([data-theme='light']) input[type="date"]::-webkit-calendar-picker-indicator {
@@ -43,6 +47,8 @@
   --color-code-bg: #1e1e1e;
   --settlement-danger: #f87171;
   --settlement-danger-bg: #3f1d1d;
+  --settlement-warning: #fbbf24;
+  --settlement-warning-bg: #423107;
 }
 
 :root[data-theme='dark'] input[type="date"]::-webkit-calendar-picker-indicator {
@@ -92,6 +98,39 @@ body {
   font-size: 1.05rem;
   cursor: pointer;
   line-height: 1;
+}
+
+.app-tabs {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-tab {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  min-height: 40px;
+}
+
+.app-tab:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.app-tab.is-active {
+  background: var(--color-accent);
+  color: #ffffff;
 }
 
 .container {
@@ -148,7 +187,8 @@ body {
   color: var(--color-text-secondary);
 }
 
-.field input {
+.field input,
+.field select {
   border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.55rem 0.6rem;
@@ -159,7 +199,8 @@ body {
   width: 100%;
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }

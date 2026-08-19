@@ -2,130 +2,36 @@
   'use strict';
 
   var STATE_KEY = 'settlement-app-state';
-  var THEME_KEY = 'settlement-app-theme';
 
   var state = null;
 
   // ---------------------------------------------------------------------
-  // 숫자 유틸
+  // 공통 유틸 (shared-utils.js) — round/calcVat/calcTotal/parseNumber/
+  // formatNumber/formatBizRegNo/escapeAttr/sanitizeFilenamePart 함수 정의는
+  // shared-utils.js로 옮겼다. 계산 규칙이 두 화면(정산서 화면/계산서함)에서
+  // 어긋나면 자동 생성된 정산서 금액이 화면마다 다르게 보이는 치명적 버그로
+  // 이어지므로, 여기서는 SettlementShared를 그대로 참조만 한다.
   // ---------------------------------------------------------------------
-  function round(n) { return Math.round(n); }
-
-  function calcVat(supplyAmount) {
-    return round((Number(supplyAmount) || 0) * 0.1);
-  }
-
-  function calcTotal(supplyAmount, vat) {
-    return (Number(supplyAmount) || 0) + (Number(vat) || 0);
-  }
-
-  function parseNumber(v) {
-    if (typeof v === 'number') return isNaN(v) ? 0 : Math.round(v);
-    if (v === null || v === undefined) return 0;
-    var s = String(v).replace(/,/g, '');
-    var neg = /^\s*-/.test(s);
-    s = s.replace(/[^0-9]/g, '');
-    var n = parseInt(s, 10);
-    if (isNaN(n)) n = 0;
-    return neg ? -n : n;
-  }
-
-  function formatNumber(n) {
-    n = Number(n) || 0;
-    return n.toLocaleString('ko-KR');
-  }
-
-  // 사업자등록번호: 숫자만 입력해도 "000-00-00000" 형식으로 자동 변환
-  function formatBizRegNo(raw) {
-    var digits = String(raw || '').replace(/[^0-9]/g, '').slice(0, 10);
-    var out = digits.slice(0, 3);
-    if (digits.length > 3) out += '-' + digits.slice(3, 5);
-    if (digits.length > 5) out += '-' + digits.slice(5, 10);
-    return out;
-  }
-
-  function escapeAttr(v) {
-    return String(v === null || v === undefined ? '' : v)
-      .replace(/&/g, '&amp;')
-      .replace(/"/g, '&quot;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
-  function sanitizeFilenamePart(s) {
-    return String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
-  }
+  var SettlementShared = window.SettlementShared;
+  var round = SettlementShared.round;
+  var calcVat = SettlementShared.calcVat;
+  var calcTotal = SettlementShared.calcTotal;
+  var parseNumber = SettlementShared.parseNumber;
+  var formatNumber = SettlementShared.formatNumber;
+  var formatBizRegNo = SettlementShared.formatBizRegNo;
+  var escapeAttr = SettlementShared.escapeAttr;
+  var sanitizeFilenamePart = SettlementShared.sanitizeFilenamePart;
 
   // ---------------------------------------------------------------------
-  // 상태(state) 초기값
+  // 상태(state) 초기값 — 팩토리 함수는 shared-utils.js로 이관됨. 계산서함
+  // (invoices.js)의 "공사명으로 정산서 생성"이 정확히 같은 모양의 빈
+  // 정산서를 만들어야 하므로 여기서도 SettlementShared를 그대로 참조한다.
   // ---------------------------------------------------------------------
-  function makeSubcontractRow(id) {
-    return {
-      id: id,
-      workType: '',
-      issueDate: '',
-      vendor: '',
-      bizRegNo: '',
-      supplyAmount: 0,
-      taxInvoiceIssued: false,
-      bank: '',
-      payDate: '',
-      paidAmount: 0,
-      accountInfo: '',
-      contact: '',
-      note: ''
-    };
-  }
-
-  function makeLaborRow(id) {
-    return {
-      id: id,
-      issueDate: '',
-      workerName: '',
-      item: '',
-      supplyAmount: 0,
-      withholdingTax: 0
-    };
-  }
-
-  function makeEtcRow(id) {
-    return {
-      id: id,
-      issueDate: '',
-      vendor: '',
-      item: '',
-      supplyAmount: 0,
-      vat: 0
-    };
-  }
-
-  function createEmptyState() {
-    return {
-      projectInfo: { name: '', supplyAmount: 0 },
-      subcontract: [makeSubcontractRow(1)],
-      labor: [makeLaborRow(1)],
-      etc: [makeEtcRow(1)],
-      account: { bankName: '', accountNumber: '' },
-      subcontractNextId: 2,
-      laborNextId: 2,
-      etcNextId: 2
-    };
-  }
-
-  function normalizeState(parsed) {
-    var empty = createEmptyState();
-    if (!parsed || typeof parsed !== 'object') return empty;
-    return {
-      projectInfo: Object.assign({}, empty.projectInfo, parsed.projectInfo || {}),
-      subcontract: Array.isArray(parsed.subcontract) ? parsed.subcontract : empty.subcontract,
-      labor: Array.isArray(parsed.labor) ? parsed.labor : empty.labor,
-      etc: Array.isArray(parsed.etc) ? parsed.etc : empty.etc,
-      account: Object.assign({}, empty.account, parsed.account || {}),
-      subcontractNextId: parsed.subcontractNextId || empty.subcontractNextId,
-      laborNextId: parsed.laborNextId || empty.laborNextId,
-      etcNextId: parsed.etcNextId || empty.etcNextId
-    };
-  }
+  var makeSubcontractRow = SettlementShared.makeSubcontractRow;
+  var makeLaborRow = SettlementShared.makeLaborRow;
+  var makeEtcRow = SettlementShared.makeEtcRow;
+  var createEmptyState = SettlementShared.createEmptyState;
+  var normalizeState = SettlementShared.normalizeState;
 
   // ---------------------------------------------------------------------
   // localStorage 저장/복원
@@ -135,6 +41,18 @@
       localStorage.setItem(STATE_KEY, JSON.stringify(state));
     } catch (e) {
       /* storage unavailable - 무시 */
+    }
+    // 공사명이 있으면 "저장된 정산서 저장소"에도 함께 미러 저장한다. 이렇게
+    // 하면 사용자가 index.html에서 손으로 채우는 기존 워크플로우도 자동으로
+    // "이름 붙은 정산서 저장소"에 쌓이고, 계산서함에서 자동 생성한 정산서도
+    // 같은 저장소를 공유하게 된다.
+    // (spec-v2-invoice.md 3.1은 이 미러 저장을 onStateChange()에 붙이도록
+    // 명시했지만, 실제로는 공사명 입력 등 여러 경로가 onStateChange()를
+    // 거치지 않고 saveToLocalStorage()만 직접 호출한다 — 예: bindSimpleInputs()의
+    // 공사명 input 핸들러. saveToLocalStorage()가 유일한 저장 지점이므로
+    // 여기에 붙여야 모든 저장 경로에서 누락 없이 미러링된다.)
+    if (state.projectInfo.name) {
+      SettlementShared.saveProjectByName(state.projectInfo.name, state);
     }
   }
 
@@ -149,33 +67,14 @@
   }
 
   // ---------------------------------------------------------------------
-  // 다크모드 (js/theme.js 패턴을 별도 localStorage 키로 자체 구현)
+  // 다크모드 — shared-utils.js로 이관됨(테마 키도 그대로 공유).
+  // shared-utils.js가 이 파일보다 먼저 로드되며 파싱 시점에 이미 테마를
+  // 적용해두므로(깜빡임 방지) 여기서는 함수만 참조한다.
   // ---------------------------------------------------------------------
-  function getPreferredTheme() {
-    var stored = localStorage.getItem(THEME_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
-  function updateThemeToggleIcon(theme) {
-    var btn = document.getElementById('theme-toggle');
-    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
-  }
-
-  function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    updateThemeToggleIcon(theme);
-  }
-
-  function toggleTheme() {
-    var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    var next = current === 'dark' ? 'light' : 'dark';
-    localStorage.setItem(THEME_KEY, next);
-    applyTheme(next);
-  }
-
-  // 페이지 렌더 전에 즉시 적용해 깜빡임을 방지한다.
-  applyTheme(getPreferredTheme());
+  var getPreferredTheme = SettlementShared.getPreferredTheme;
+  var updateThemeToggleIcon = SettlementShared.updateThemeToggleIcon;
+  var applyTheme = SettlementShared.applyTheme;
+  var toggleTheme = SettlementShared.toggleTheme;
 
   // ---------------------------------------------------------------------
   // 소계 계산
@@ -256,6 +155,64 @@
     var total = calcTotal(state.projectInfo.supplyAmount, vat);
     document.getElementById('project-vat').textContent = formatNumber(vat);
     document.getElementById('project-total').textContent = formatNumber(total);
+
+    populateProjectPicker();
+  }
+
+  // ---------------------------------------------------------------------
+  // "저장된 정산서 불러오기" 드롭다운
+  //
+  // settlement-app-saved-projects 저장소(공사명 → 정산서 state)에 있는
+  // 공사명 목록을 보여준다. 계산서함(invoices.html)에서 "공사명으로 정산서
+  // 생성"을 눌러 만든 정산서도, index.html에서 손으로 채워 자동 미러 저장된
+  // 정산서도 같은 저장소를 공유하므로 여기서 함께 보인다.
+  // ---------------------------------------------------------------------
+  function populateProjectPicker() {
+    var select = document.getElementById('project-picker');
+    if (!select) return;
+    var names = SettlementShared.getSavedProjectNames().sort(function (a, b) {
+      return a.localeCompare(b, 'ko');
+    });
+    var html = '<option value="">불러올 정산서 선택…</option>';
+    names.forEach(function (name) {
+      html += '<option value="' + escapeAttr(name) + '">' + escapeAttr(name) + '</option>';
+    });
+    if (document.activeElement !== select) select.innerHTML = html;
+  }
+
+  function bindProjectPicker() {
+    var select = document.getElementById('project-picker');
+    if (!select) return;
+    select.addEventListener('change', function () {
+      var chosen = select.value;
+      select.value = '';
+      if (!chosen) return;
+
+      // 고른 공사명이 지금 화면과 다를 때만 "벗어나도 되는지" 확인한다. 같은
+      // 공사명을 다시 고른 경우에도 그냥 무시하지 않고 저장소에서 다시
+      // 불러온다 — 계산서함(invoices.html)에서 같은 공사명으로 "정산서 생성"
+      // (병합)을 실행하면 저장소(settlement-app-saved-projects)의 내용만
+      // 갱신되고 지금 화면의 활성 상태(state)는 그대로이므로, 같은 이름을
+      // 다시 선택해도 아무 일도 일어나지 않으면 방금 계산서함에서 반영한
+      // 내용을 이 화면에서 확인할 방법이 없어진다.
+      if (chosen !== state.projectInfo.name && state.projectInfo.name) {
+        var ok = confirm(
+          '현재 화면(' + state.projectInfo.name + ')에서 벗어나 "' + chosen + '" 정산서를 불러옵니다.\n' +
+          '현재 내용은 이미 이 브라우저에 자동 저장되어 있으니, 나중에 이 드롭다운에서 다시 선택해 불러올 수 있습니다.\n\n계속할까요?'
+        );
+        if (!ok) return;
+      }
+
+      var saved = SettlementShared.loadSavedProjects();
+      var projectState = saved[chosen];
+      if (!projectState) {
+        alert('저장된 정산서를 찾을 수 없습니다.');
+        return;
+      }
+      state = normalizeState(projectState);
+      renderAll();
+      saveToLocalStorage();
+    });
   }
 
   function renderAccount() {
@@ -1242,6 +1199,7 @@
     bindFolderButtons();
     bindMoneyFormatting();
     bindDatePickers();
+    bindProjectPicker();
 
     updateThemeToggleIcon(document.documentElement.getAttribute('data-theme'));
     if (!supportsFsAccess()) {
