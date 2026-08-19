@@ -277,23 +277,45 @@
     document.head.appendChild(style);
   }
 
+  // "이 브라우저에 저장된 기존 데이터가 있는가"로 신규/기존 사용자를
+  // 구분한다. last-seen-version 키 자체는 이번 업데이트에서 처음 생긴
+  // 것이라, 예전부터 쓰던 사용자도 이 키만 보면 "처음 방문"으로 착각하기
+  // 쉽다 — 실제로 이런 이유로 첫 배포 직후 기존 사용자에게 안내가 전혀
+  // 안 뜨는 문제가 있었다. 정산서/계산서 상태가 이미 저장되어 있다면
+  // "예전부터 쓰던 사용자"로 판단한다.
+  function hasExistingAppData() {
+    try {
+      return !!(localStorage.getItem('settlement-app-state') ||
+        localStorage.getItem('settlement-invoices-state') ||
+        localStorage.getItem('settlement-app-saved-projects'));
+    } catch (e) {
+      return false;
+    }
+  }
+
   // 확인하지 않은(마지막으로 본 버전 이후) changelog 항목이 있으면
   // 커스텀 모달로 보여주고, 닫으면 최신 버전을 "확인함"으로 기록한다.
   //
-  // 첫 방문자(저장된 값이 아예 없는 경우) 처리 방침: "새로 생긴 기능" 안내는
-  // 원래 쓰던 사용자가 다음에 왔을 때 의미가 있는 안내이므로, 한 번도 앱을
-  // 써본 적 없는 사용자에게 "계산서함이 새로 생겼어요"라고 보여주는 것은
-  // 어색하다(기준이 되는 이전 버전이 없기 때문). 따라서 첫 방문자에게는
-  // 모달을 띄우지 않고 조용히 현재 최신 버전으로 기록만 해서, 다음 업데이트
-  // 부터 정상적으로 "새로 생긴 기능" 안내를 받게 한다.
+  // 진짜 첫 방문자(저장된 값이 아예 없는 경우) 처리 방침: "새로 생긴 기능"
+  // 안내는 원래 쓰던 사용자가 다음에 왔을 때 의미가 있는 안내이므로, 한 번도
+  // 앱을 써본 적 없는 사용자에게 "계산서함이 새로 생겼어요"라고 보여주는
+  // 것은 어색하다(기준이 되는 이전 버전이 없기 때문). 따라서 진짜 신규
+  // 방문자에게는 모달을 띄우지 않고 조용히 현재 최신 버전으로 기록만 해서,
+  // 다음 업데이트부터 정상적으로 "새로 생긴 기능" 안내를 받게 한다.
   function showChangelogIfNeeded() {
     var latest = getLatestVersion();
     if (!latest) return;
 
     var lastSeen = getLastSeenVersion();
     if (lastSeen === null) {
-      setLastSeenVersion(latest);
-      return;
+      if (!hasExistingAppData()) {
+        setLastSeenVersion(latest);
+        return;
+      }
+      // 데이터는 있지만 버전 기록이 없는 기존 사용자 — 이번 업데이트
+      // 내용을 아직 못 본 것이므로, 최신 항목 하나만 보여준다(그 이전
+      // 이력까지 전부 보여주면 오히려 낯설 수 있다).
+      lastSeen = APP_CHANGELOG.length > 1 ? APP_CHANGELOG[1].version : null;
     }
     if (lastSeen === latest) return;
 
