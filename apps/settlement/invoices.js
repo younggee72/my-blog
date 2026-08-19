@@ -45,7 +45,7 @@ var state = null;
 var processingIds = {};
 
 var TEXT_MIN_LENGTH = 20;
-var INVOICE_EXT_RE = /\.(pdf|jpe?g|png|webp|heic)$/i;
+var INVOICE_EXT_RE = /\.(pdf|jpe?g|png|webp|heic|xlsx)$/i;
 var IMAGE_EXT_RE = /^(jpe?g|png|webp|heic)$/i;
 var WORK_TYPE_KEYWORDS = [
   '철근', '콘크리트', '형틀', '골조', '토공', '조적', '미장', '방수', '타일',
@@ -581,6 +581,96 @@ async function extractImageInvoiceData(file) {
   return Object.assign({}, fields, { parseMethod: 'ocr', rawText: text });
 }
 
+// 엑셀 셀 값(문자열/숫자/날짜/수식결과/리치텍스트/하이퍼링크 등 ExcelJS가
+// 반환할 수 있는 형태들)을 하나의 평문 문자열로 변환한다. 날짜는
+// extractIssueDate가 기대하는 "YYYY-M-D" 계열 패턴(DATE_RE)에 맞도록
+// YYYY-MM-DD로 포맷한다. 금액은 콤마 없는 raw 숫자일 수 있는데,
+// extractAmountNear/amountAtColumnIndex가 쓰는 /[\d,]+/ 정규식은 콤마가
+// 아예 없는 순수 숫자 문자열에도 정상적으로 매치되므로(콤마는 "있어도
+// 되는" 문자일 뿐 필수가 아님) 별도 포맷 없이 String()으로 충분하다.
+function excelCellValueToString(value) {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) {
+    var y = value.getFullYear();
+    var mo = ('0' + (value.getMonth() + 1)).slice(-2);
+    var d = ('0' + value.getDate()).slice(-2);
+    return y + '-' + mo + '-' + d;
+  }
+  if (typeof value === 'object') {
+    if (Array.isArray(value.richText)) {
+      return value.richText.map(function (rt) { return rt.text || ''; }).join('');
+    }
+    if (value.formula !== undefined) {
+      return excelCellValueToString(value.result);
+    }
+    if (value.text !== undefined) return String(value.text);
+    return '';
+  }
+  return String(value);
+}
+
+// 워크시트 하나를 행 단위로 순회해 하나의 평문 텍스트로 합친다
+// (extractExcelInvoiceData와 findInvoiceSheetText에서 공유).
+//
+// (review-v5) 병합 셀(예: "상호" 라벨 칸을 A8:B8로 병합)이 있으면 ExcelJS는
+// 병합 범위 안의 "주인이 아닌" 칸(slave cell)도 cell.value로 주인 칸(master
+// cell)과 동일한 값을 그대로 돌려준다(진짜로 각 칸에 중복 저장돼 있는 게
+// 아니라 조회 시 위임되는 것). 이를 그대로 이어붙이면 "상호 상호
+// 실제회사명"처럼 라벨이 중복돼, 텍스트 기반 추출기가 두 번째 "상호"를
+// 값으로 오인하는 버그가 실제 테스트로 재현됐다. 병합 범위의 주인이 아닌
+// 칸(cell.isMerged && cell.master !== cell)은 건너뛰어 한 번만 반영한다.
+function worksheetToText(worksheet) {
+  var lines = [];
+  worksheet.eachRow({ includeEmpty: false }, function (row) {
+    var cellTexts = [];
+    row.eachCell({ includeEmpty: false }, function (cell) {
+      if (cell.isMerged && cell.master !== cell) return;
+      var str = excelCellValueToString(cell.value).trim();
+      if (str) cellTexts.push(str);
+    });
+    if (cellTexts.length) lines.push(cellTexts.join(' '));
+  });
+  return lines.join('\n');
+}
+
+// extractExcelInvoiceData(file) — PDF/이미지와 나란한 엑셀(.xlsx) 추출
+// 경로. ExcelJS로 워크북을 읽어 텍스트로 합친 뒤, 그 이후는 다른 경로와
+// 완전히 동일하게 isTaxInvoiceDocument()로 세금계산서 여부를 가리고
+// extractFieldsFromText() 하나로만 필드를 뽑는다(로직 이중화 금지,
+// spec-v2-invoice.md 3.2).
+//
+// (review-v5) 처음에는 첫 워크시트만 읽었는데, 표지/요약 시트가 앞에 있고
+// 실제 세금계산서 내용은 두 번째(또는 그 이후) 시트에 있는 실사용 파일로
+// 재현되는 문제가 있었다 — 이 경우 첫 시트 텍스트는 세금계산서로 판별되지
+// 않거나(짧아서) 내용이 통째로 비어, 파일이 조용히 "인식 실패"로 목록에서
+// 사라져 사용자가 원인을 알 길이 없었다. 이제 모든 시트를 순서대로 훑어
+// isTaxInvoiceDocument()로 "세금계산서로 보이는" 첫 시트를 찾아 그 시트의
+// 텍스트를 사용한다. 어떤 시트도 세금계산서로 보이지 않으면(예: 진짜
+// "거래명세표" 파일이거나 완전히 빈 워크북) 기존과 동일하게 첫 시트 텍스트로
+// 폴백해 이후의 skip/미인식 판정 로직을 그대로 탄다(단일 시트 파일의 기존
+// 동작은 100% 그대로 유지됨 — 그 경우 이 폴백이 곧 기존 동작 자체이므로).
+function findInvoiceSheetText(workbook) {
+  var worksheets = workbook.worksheets || [];
+  for (var i = 0; i < worksheets.length; i++) {
+    var text = worksheetToText(worksheets[i]);
+    if (isTaxInvoiceDocument(text)) return text;
+  }
+  return worksheets.length ? worksheetToText(worksheets[0]) : '';
+}
+
+async function extractExcelInvoiceData(file) {
+  var workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await file.arrayBuffer());
+  var text = findInvoiceSheetText(workbook);
+
+  // PDF 텍스트 경로와 동일한 원칙: 세금계산서 형식이 아닌 것으로 판별되면
+  // 조용히 무시한다. 엑셀 셀 텍스트는 항상 "임베드 텍스트"가 있는 것과
+  // 동일한 신뢰도이므로(OCR 아님) OCR 폴백이나 needsReview 강제는 없다.
+  if (hasSubstantialText(text) && !isTaxInvoiceDocument(text)) return { skip: true };
+  var fields = extractFieldsFromText(text);
+  return Object.assign({}, fields, { parseMethod: 'excel', rawText: text });
+}
+
 function getExtension(name) {
   var m = /\.([a-zA-Z0-9]+)$/.exec(name || '');
   return m ? m[1].toLowerCase() : '';
@@ -592,6 +682,8 @@ async function processOneFile(file, invoiceId) {
   try {
     if (ext === 'pdf') {
       result = await extractPdfInvoiceData(file);
+    } else if (ext === 'xlsx') {
+      result = await extractExcelInvoiceData(file);
     } else if (IMAGE_EXT_RE.test(ext)) {
       result = await extractImageInvoiceData(file);
     }
