@@ -45,7 +45,7 @@ var state = null;
 var processingIds = {};
 
 var TEXT_MIN_LENGTH = 20;
-var INVOICE_EXT_RE = /\.(pdf|jpe?g|png|webp|heic|xlsx)$/i;
+var INVOICE_EXT_RE = /\.(pdf|jpe?g|png|webp|heic|xlsx|xls)$/i;
 var IMAGE_EXT_RE = /^(jpe?g|png|webp|heic)$/i;
 var WORK_TYPE_KEYWORDS = [
   '철근', '콘크리트', '형틀', '골조', '토공', '조적', '미장', '방수', '타일',
@@ -671,6 +671,86 @@ async function extractExcelInvoiceData(file) {
   return Object.assign({}, fields, { parseMethod: 'excel', rawText: text });
 }
 
+// extractXlsInvoiceData(file) — extractExcelInvoiceData(.xlsx/ExcelJS)와
+// 나란한, 구버전 바이너리 엑셀(.xls) 경로. ExcelJS는 OOXML(.xlsx)만 읽을 수
+// 있어 .xls는 읽지 못하므로, .xls만 별도로 SheetJS(전역 XLSX, invoices.html에
+// CDN 추가)로 읽는다. 기존 .xlsx/ExcelJS 경로는 이 함수와 별개로 그대로
+// 둔다(회귀 위험 최소화).
+//
+// 셀 값 변환은 excelCellValueToString을 그대로 재사용한다 — SheetJS도
+// 날짜 셀은 cellDates:true 옵션으로 읽으면 ExcelJS와 동일하게 Date 인스턴스를
+// 돌려주고, 문자열/숫자 셀은 excelCellValueToString의 마지막 String(value)
+// 분기로 그대로 처리되므로 별도 변환 로직을 중복 작성할 필요가 없다.
+//
+// (review-v5 재발 방지) worksheetToText가 병합 셀의 "주인 아닌" 칸을
+// 건너뛰어 라벨 중복을 막은 것과 같은 목적으로, SheetJS의 sheet['!merges']
+// (각 {s:{r,c}, e:{r,c}})를 훑어 병합 범위의 왼쪽 위 칸이 아닌 좌표는 모두
+// 건너뛰는 스킵 집합을 만든다. XLSX.utils.sheet_to_txt/sheet_to_csv 같은
+// 내장 유틸은 병합 셀 처리 방식이 달라 같은 버그가 재발할 수 있으므로 쓰지
+// 않고, worksheetToText와 동일한 원칙으로 셀을 직접 순회한다.
+function buildXlsMergeSkipSet(sheet) {
+  var skip = {};
+  var merges = sheet['!merges'] || [];
+  merges.forEach(function (m) {
+    for (var r = m.s.r; r <= m.e.r; r++) {
+      for (var c = m.s.c; c <= m.e.c; c++) {
+        if (r === m.s.r && c === m.s.c) continue; // 병합 범위의 주인 칸(왼쪽 위) - 유지
+        skip[r + ',' + c] = true;
+      }
+    }
+  });
+  return skip;
+}
+
+// SheetJS 워크시트(sheet) 하나를 worksheetToText와 같은 형태(행 단위,
+// 셀은 공백으로 join, 행은 개행으로 join)의 평문 텍스트로 변환한다.
+function xlsSheetToText(sheet) {
+  var ref = sheet && sheet['!ref'];
+  if (!ref) return '';
+  var range = XLSX.utils.decode_range(ref);
+  var skip = buildXlsMergeSkipSet(sheet);
+  var lines = [];
+  for (var r = range.s.r; r <= range.e.r; r++) {
+    var cellTexts = [];
+    for (var c = range.s.c; c <= range.e.c; c++) {
+      if (skip[r + ',' + c]) continue;
+      var cell = sheet[XLSX.utils.encode_cell({ r: r, c: c })];
+      if (!cell) continue;
+      var str = excelCellValueToString(cell.v).trim();
+      if (str) cellTexts.push(str);
+    }
+    if (cellTexts.length) lines.push(cellTexts.join(' '));
+  }
+  return lines.join('\n');
+}
+
+// findInvoiceSheetText(ExcelJS workbook)와 같은 목적을 SheetJS API에 맞게
+// 구현: 여러 시트 중 "세금계산서로 보이는" 첫 시트를 찾고, 없으면 첫 시트로
+// 폴백한다(단일 시트 파일의 기존 동작과 동일하게 귀결).
+function findXlsInvoiceSheetText(workbook) {
+  var sheetNames = (workbook && workbook.SheetNames) || [];
+  for (var i = 0; i < sheetNames.length; i++) {
+    var text = xlsSheetToText(workbook.Sheets[sheetNames[i]]);
+    if (isTaxInvoiceDocument(text)) return text;
+  }
+  return sheetNames.length ? xlsSheetToText(workbook.Sheets[sheetNames[0]]) : '';
+}
+
+// extractXlsInvoiceData(file) — .xls 전용 진입점. 이후 단계(세금계산서 여부
+// 판별, 필드 추출)는 다른 세 경로(PDF/이미지/.xlsx)와 완전히 동일하게
+// isTaxInvoiceDocument()/extractFieldsFromText() 하나로만 처리한다(로직
+// 이중화 금지, spec-v2-invoice.md 3.2). parseMethod는 .xlsx와 동일하게
+// 'excel'을 재사용한다(사용자에게는 "엑셀에서 읽음"이라는 같은 신뢰도로
+// 노출하면 충분하고, xls/xlsx를 구분해 보여줄 필요가 없다).
+async function extractXlsInvoiceData(file) {
+  var workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  var text = findXlsInvoiceSheetText(workbook);
+
+  if (hasSubstantialText(text) && !isTaxInvoiceDocument(text)) return { skip: true };
+  var fields = extractFieldsFromText(text);
+  return Object.assign({}, fields, { parseMethod: 'excel', rawText: text });
+}
+
 function getExtension(name) {
   var m = /\.([a-zA-Z0-9]+)$/.exec(name || '');
   return m ? m[1].toLowerCase() : '';
@@ -684,6 +764,8 @@ async function processOneFile(file, invoiceId) {
       result = await extractPdfInvoiceData(file);
     } else if (ext === 'xlsx') {
       result = await extractExcelInvoiceData(file);
+    } else if (ext === 'xls') {
+      result = await extractXlsInvoiceData(file);
     } else if (IMAGE_EXT_RE.test(ext)) {
       result = await extractImageInvoiceData(file);
     }
