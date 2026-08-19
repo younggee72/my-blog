@@ -1,56 +1,50 @@
-# Build 서브에이전트 지침 — 계산서함: 엑셀(.xlsx) 파일도 계산서로 인식하도록 추가
+# Build 서브에이전트 지침 — 현장정산서: 업데이트 안내(What's New) 메시지 창 추가
 
 ## 역할
 너는 이 프로젝트(마크다운 블로그 + 미니 웹앱 포트폴리오)의 **Build 단계** 서브에이전트다.
-`apps/settlement/` 계산서함(계산서 업로드/폴더연결) 기능이 PDF/이미지뿐 아니라 **엑셀(.xlsx) 파일도 읽어서 자동인식**하도록 확장하는 것이 임무다.
+현장정산서 앱(`apps/settlement/`)에 "업그레이드되면 업그레이드 내용을 확인하는 메시지 창"을 추가하는 것이 임무다. 앞으로도 앱이 업데이트될 때마다 계속 쓸 수 있는 **재사용 가능한 변경사항 안내(changelog) 구조**로 만들어야 한다.
 
 ## 배경
-지금까지 계산서함은 PDF(PDF.js 텍스트 추출 또는 OCR)와 이미지(Tesseract.js OCR)만 지원했다. 사용자가 세금계산서를 엑셀 파일(.xlsx)로도 갖고 있어서, 이것도 업로드/폴더연결로 읽어 자동인식하고 싶어한다.
+이 앱은 최근 큰 업데이트를 거쳤다(계산서함 신설: 세금계산서 PDF/이미지/엑셀 자동인식, 공사명별 정산서 자동생성). 사용자가 다음에 접속했을 때 "뭐가 새로 생겼는지" 안내하는 팝업을 원한다. 한 번 보여주면 다시 안 뜨고, 다음 업데이트가 생기면 그때 새 안내가 또 한 번 뜨는 방식이어야 한다(매번 뜨면 안 됨).
 
 ## 범위 제한 (매우 중요)
-- **오직 `apps/settlement/invoices.js`, `apps/settlement/invoices.html` 파일만 수정한다.**
-- 다른 파일(`index.html`, `settlement.js`, `shared-utils.js`, `style.css`, `invoices.css`, spec/review 문서들)은 건드리지 않는다.
+- **오직 `apps/settlement/` 폴더 안의 파일만 수정/생성한다.** (`shared-utils.js`, `index.html`, `invoices.html`, `settlement.js`, `invoices.js`, `style.css`, `invoices.css` 중 필요한 파일)
+- 프로젝트의 다른 파일(블로그 본체, 다른 앱)은 건드리지 않는다.
 
 ## 시작 전 필수: 기존 코드 읽기
-`apps/settlement/invoices.js`와 `invoices.html` 전체를 읽어라. 특히:
-- `INVOICE_EXT_RE`, `IMAGE_EXT_RE` (허용 확장자 정규식)
-- `extractPdfInvoiceData`, `extractImageInvoiceData` (파일 형식별 추출 함수, `processOneFile`에서 확장자로 분기)
-- `extractFieldsFromText(text)` — 어떤 경로든 최종적으로 이 함수 하나로 텍스트를 넘겨 필드를 뽑는다는 원칙(spec-v2-invoice.md 3.2)을 그대로 유지해야 한다.
-- `invoices.html`의 업로드 input `accept` 속성, 드롭존 안내 문구, 폴더 연결 안내 문구.
-- `apps/settlement/index.html`이나 `apps/settlement/settlement.js`가 이미 ExcelJS를 CDN(`exceljs@4.4.0`)으로 쓰고 있는 부분을 참고하라(같은 CDN 버전을 재사용해 일관성을 유지하라). `invoices.html`에는 아직 ExcelJS가 로드되어 있지 않으므로 새로 스크립트 태그를 추가해야 한다.
+`apps/settlement/shared-utils.js`, `index.html`, `invoices.html`, `settlement.js`, `invoices.js`, `style.css`를 읽어라. 이 앱은 다크모드(`prefers-color-scheme` + `[data-theme]` + localStorage), 팔레트(`/css/style.css`의 `:root` CSS 변수), localStorage 기반 상태 저장 패턴을 이미 갖고 있다 — 새로 만드는 UI도 이 패턴을 그대로 따라야 한다.
 
 ## 구현할 것
 
-### 1. 확장자 허용 목록에 xlsx 추가
-`INVOICE_EXT_RE`(파일 필터링에 쓰이는 정규식)에 `xlsx`를 추가하라. (엑셀 매크로 포함 등 다른 엑셀 확장자까지 넓힐 필요는 없다 — `.xlsx`만 지원하면 된다.)
+### 1. `shared-utils.js`에 변경사항(changelog) 데이터와 표시 로직 추가
+- `APP_CHANGELOG` 배열을 하나 만들어라. 각 항목은 `{ version: "2.1", date: "2026-08-19", title: "...", items: ["...", "..."] }` 형태로, **최신 항목이 배열 맨 앞(또는 맨 뒤 — 일관되게)**에 오도록 하라. 첫 항목은 이번 업데이트 내용으로 채워라(아래 "채울 내용" 참고).
+- localStorage 키 `settlement-app-last-seen-version`을 새로 만들어, 사용자가 마지막으로 확인한 버전을 저장한다.
+- `window.SettlementShared`에 아래를 추가로 노출하라:
+  - `APP_CHANGELOG` (또는 최신 버전 문자열을 알 수 있는 `getLatestVersion()`)
+  - `getLastSeenVersion()` / `setLastSeenVersion(version)`
+  - `showChangelogIfNeeded()` — 마지막으로 본 버전이 최신 버전과 다르면(또는 아예 없으면) 안내 창을 띄우고, 사용자가 닫으면 `setLastSeenVersion(최신버전)`을 호출해 다시 안 뜨게 한다. **처음 이 앱을 쓰는 사용자**(저장된 값이 아예 없는 경우)에게는 "새로 생긴 기능" 안내가 아니라 자연스러운 초회 안내여도 되고, 아니면 아예 안 띄우고 조용히 최신 버전으로 기록만 해도 된다 — 어느 쪽이든 스스로 합리적으로 판단해 구현하고 그 이유를 주석으로 남겨라.
+- 안내 창 UI는 `alert()` 같은 네이티브 대화상자가 아니라, **사이트 팔레트를 따르는 커스�텀 모달**(오버레이 + 카드)로 만들어라. 다크모드에서도 정상적으로 보여야 한다. 배열의 모든 미확인 버전을 한 번에(또는 최신 것 하나만 — 스스로 판단) 보여주면 된다. 닫기 버튼(예: "확인" 버튼, 배경 클릭으로도 닫히게)을 포함하라.
+- 이 함수를 호출하는 스타일은 함수 자체 안에서 모달 DOM을 만들어 `document.body`에 붙였다가 닫으면 제거하는 방식으로 구현하면 된다(별도 HTML 마크업을 index.html/invoices.html에 미리 넣어둘 필요 없이, JS만으로 완결되게 만드는 것을 권장한다 — 그래야 두 화면에서 재사용하기 쉽다).
 
-### 2. 엑셀 텍스트 추출 함수 추가
-`extractPdfInvoiceData`/`extractImageInvoiceData`와 나란히 `extractExcelInvoiceData(file)` 함수를 추가하라:
-- ExcelJS(`invoices.html`에 CDN으로 추가한 것, `apps/settlement/index.html`이 쓰는 것과 같은 `exceljs@4.4.0` 버전)로 워크북을 읽는다(`workbook.xlsx.load(await file.arrayBuffer())`).
-- 첫 번째 워크시트(세금계산서가 보통 1시트로 오므로)의 모든 셀 값을 **행(row) 단위로 순회하며, 같은 행의 셀 값들은 공백으로 이어붙이고, 행이 바뀌면 줄바꿈(`\n`)으로 구분**해서 하나의 텍스트로 합쳐라. 빈 셀은 건너뛴다. 셀 값이 숫자(금액)면 그대로 문자열로 변환하되, 천단위 구분 콤마가 없는 raw 숫자일 수 있으므로 `toLocaleString()`이나 단순 `String()`으로 변환해도 무방하다(기존 `extractAmountNear`의 숫자 추출 정규식 `[\d,]+`이 콤마 없는 숫자에도 매치되는지 확인하고, 안 되면 그 정규식이 콤마 없는 순수 숫자도 인식하도록 손봐도 된다 — 다만 이건 `apps/settlement/invoices.js`의 기존 정규식이라 다른 경로에도 영향을 주니 신중하게 확인하라).
-- 이렇게 합쳐진 텍스트를 기존 `extractFieldsFromText(text)`에 그대로 넘긴다(PDF 텍스트 경로와 동일한 함수를 재사용 — 로직 이중화 금지 원칙, spec-v2-invoice.md 3.2).
-- 이 문서가 세금계산서 형식인지 판별하는 `isTaxInvoiceDocument(text)`도 그대로 재사용하되, 그 판별에 실패해서 "세금계산서 아님"으로 나오면 다른 형식(PDF/이미지)과 동일하게 조용히 무시(`{ skip: true }`)하도록 처리하라.
-- `parseMethod`는 `'excel'`로 새로 추가해 구분하라(다른 값들 `'pdf-text'`/`'ocr'`/`'manual'`/`'failed'`와 나란히). 엑셀에서 뽑은 값은 OCR과 달리 원문 그대로의 텍스트이므로, PDF 텍스트 추출과 동일하게 `needsReview`를 강제로 true 처리하지 않아도 된다(기존 PDF 텍스트 경로와 같은 수준의 신뢰도로 취급).
-- `result.rawText`에도 합쳐진 텍스트를 담아, 기존 "텍스트" 진단 버튼(`data-action="rawtext"`)에서 그대로 확인 가능하게 하라.
+### 2. `settlement.js`와 `invoices.js` 양쪽에서 호출
+두 화면 모두 초기화 시점(다른 초기 렌더링/바인딩과 비슷한 시점)에 `SettlementShared.showChangelogIfNeeded()`를 호출하도록 한 줄씩 추가하라. 최초 로드 시 딱 한 번만 판단되므로, 사용자가 index.html에서 먼저 봤으면 invoices.html에서는 다시 안 뜨고, 그 반대도 마찬가지여야 한다(둘 다 같은 localStorage 키를 공유하므로 자연히 그렇게 된다).
 
-### 3. `processOneFile`에서 확장자 분기 추가
-`getExtension(file.name)`이 `'xlsx'`일 때 `extractExcelInvoiceData(file)`을 호출하도록 분기를 추가하라. PDF/이미지와 마찬가지로 `try/catch`로 감싸 파싱 실패 시 `result = null`(→ 기존 "미인식" 처리 경로)로 안전하게 떨어지게 하라.
-
-### 4. UI 업데이트
-- `invoices.html`의 파일 업로드 `<input type="file" accept="...">`에 `.xlsx`(또는 xlsx의 MIME 타입 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`)를 추가하라.
-- 업로드 카드/드롭존 안내 문구("PDF(전자세금계산서) 또는 스캔본·스크린샷 이미지를...")에 "엑셀(.xlsx)"도 언급하도록 자연스럽게 수정하라.
-- 폴더 연결 카드 안내 문구도 마찬가지로 xlsx를 언급하도록 손봐라.
-- `handleFileList`(드래그앤드롭/파일선택 처리)와 `scanInvoiceDirHandle`(폴더 스캔)이 xlsx 파일도 걸러내지 않고 받아들이는지 확인하라 — 둘 다 `INVOICE_EXT_RE` 또는 파일 MIME 타입을 기준으로 필터링하므로, 1번에서 정규식만 고치면 자동으로 반영될 가능성이 높지만 직접 코드를 읽고 확인하라.
-- ExcelJS CDN 스크립트 태그를 `invoices.html`에 추가하라. 위치는 다른 CDN 스크립트(PDF.js, Tesseract.js)와 나란히, `shared-utils.js`/`invoices.js`보다 먼저 로드되도록 하라.
+### 3. 채울 내용 (이번 업데이트의 changelog 항목)
+아래 내용을 참고해 자연스러운 한국어 문장으로 다듬어 첫 changelog 항목으로 넣어라(그대로 복붙하지 말고 사용자에게 보여줄 안내문답게 다듬어도 좋다):
+- 제목 예: "계산서함이 새로 생겼어요"
+- 세금계산서 PDF/이미지/엑셀(.xlsx)을 업로드하거나 폴더로 연결하면 발행일·거래처·사업자등록번호·공급가액·부가세·합계를 자동으로 읽어옵니다.
+- 공사명별로 계산서를 모아서 정산서 작성 화면에 한 번에 반영(자동 생성)할 수 있습니다.
+- 정산서 작성 화면 상단에 "저장된 정산서 불러오기"가 추가되어, 여러 공사의 정산서를 한 화면에서 오가며 관리할 수 있습니다.
+version은 `"2.1"`로, date는 `"2026-08-19"`로 하라.
 
 ## 검증
-1. Node.js(또는 ExcelJS가 Node에서도 동작하므로 실제로 ExcelJS로 작은 테스트 xlsx 파일을 만들어서) 아래를 확인하라:
-   - 발행일/거래처/사업자등록번호/공급가액/세액/합계금액에 해당하는 라벨-값 쌍을 각기 다른 셀에 넣은 간단한 세금계산서 형태의 xlsx를 만들어, `extractExcelInvoiceData` 경로로 값이 정확히 추출되는지.
-   - "거래명세표"라는 제목이 든 xlsx는 조용히 무시되는지(1번과 동일 원칙).
-2. `node --check apps/settlement/invoices.js`로 문법 검증.
-3. 브라우저 프리뷰로 `invoices.html`을 열어 콘솔 에러 없이 로드되는지 확인(ExcelJS CDN 로드 포함).
-4. 기존 PDF/이미지 인식 경로가 이번 수정으로 회귀하지 않았는지(코드를 읽고 확인 — PDF/이미지 관련 함수는 건드리지 않았어야 한다).
-5. `invoices.html`의 `<script>` 태그에 있는 캐시 버스팅 쿼리스트링(`?v=11` 형태)이 있다면, 이번 수정 이후 버전 번호를 하나 올려라(예: `?v=12`) — 그래야 실사용자 브라우저가 새 코드를 확실히 받는다. `apps/settlement/style.css`/`shared-utils.js` 등 이번에 안 건드린 파일의 버전은 그대로 둬도 된다.
+1. `node --check apps/settlement/shared-utils.js apps/settlement/settlement.js apps/settlement/invoices.js`로 문법 검증.
+2. 브라우저 프리뷰로 `index.html`을 열어(localStorage를 비운 새 세션 가정, 또는 개발자도구로 `settlement-app-last-seen-version` 키를 지우고 새로고침) 안내 창이 실제로 뜨는지 확인하라. 닫은 뒤 새로고침하면 다시 안 뜨는지도 확인하라.
+3. `invoices.html`에서도 같은 방식으로 확인하되, 이미 index.html에서 확인한 뒤라면(같은 브라우저 세션) 다시 뜨지 않아야 한다 — localStorage 키를 지운 뒤 이번엔 invoices.html을 먼저 열어서 거기서도 정상적으로 뜨는지 확인하라.
+4. 라이트/다크 모드 양쪽에서 모달이 잘 보이는지(텍스트 대비, 배경) 확인하라.
+5. 모바일 폭(375px)에서도 모달이 화면을 벗어나지 않는지 확인하라.
+6. 기존 기능(정산서 입력/저장, 계산서 업로드 등)에 회귀가 없는지 확인하라.
+7. `invoices.html`/`index.html`의 `<script>` 캐시 버스팅 쿼리스트링 버전이 있다면(예: `?v=13`, `?v=6`), 이번에 수정한 파일들의 버전을 하나씩 올려라.
 
 ## 보고
-작업이 끝나면 무엇을 수정했는지, 검증 결과를 400자 이내로 요약해서 보고하라.
+작업이 끝나면 무엇을 만들었는지, 검증 결과를 400자 이내로 요약해서 보고하라.

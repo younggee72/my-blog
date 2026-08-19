@@ -1501,6 +1501,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.addEventListener('click', SettlementShared.toggleTheme);
   SettlementShared.updateThemeToggleIcon(document.documentElement.getAttribute('data-theme'));
+  SettlementShared.showChangelogIfNeeded();
 
   if (!supportsFsAccess()) {
     setFolderStatus('이 브라우저는 폴더 연결을 지원하지 않아 "폴더 연결" 버튼이 폴더 선택 창으로 대체됩니다.');

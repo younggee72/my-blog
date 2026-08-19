@@ -15,6 +15,7 @@
 
   var THEME_KEY = 'settlement-app-theme';
   var SAVED_PROJECTS_KEY = 'settlement-app-saved-projects';
+  var LAST_SEEN_VERSION_KEY = 'settlement-app-last-seen-version';
 
   // ---------------------------------------------------------------------
   // 숫자 유틸
@@ -213,6 +214,163 @@
     return Object.keys(loadSavedProjects());
   }
 
+  // ---------------------------------------------------------------------
+  // 업데이트 안내(changelog) — 앱이 업데이트될 때마다 이 배열 맨 앞에
+  // 새 항목을 추가하면 된다(최신이 맨 앞). index.html과 invoices.html이
+  // 이 파일 하나(그리고 localStorage 키 하나)를 공유하므로, 사용자가 둘 중
+  // 어느 화면을 먼저 열어도 안내는 딱 한 번만 뜬다.
+  // ---------------------------------------------------------------------
+  var APP_CHANGELOG = [
+    {
+      version: '2.1',
+      date: '2026-08-19',
+      title: '계산서함이 새로 생겼어요',
+      items: [
+        '세금계산서 PDF·이미지·엑셀(.xlsx)을 업로드하거나 폴더로 연결하면 발행일·거래처·사업자등록번호·공급가액·부가세·합계를 자동으로 읽어옵니다.',
+        '공사명별로 계산서를 모아서 정산서 작성 화면에 한 번에 반영(자동 생성)할 수 있습니다.',
+        '정산서 작성 화면 상단에 "저장된 정산서 불러오기"가 추가되어, 여러 공사의 정산서를 한 화면에서 오가며 관리할 수 있습니다.'
+      ]
+    }
+  ];
+
+  function getLatestVersion() {
+    return APP_CHANGELOG.length ? APP_CHANGELOG[0].version : null;
+  }
+
+  function getLastSeenVersion() {
+    return localStorage.getItem(LAST_SEEN_VERSION_KEY);
+  }
+
+  function setLastSeenVersion(version) {
+    try {
+      localStorage.setItem(LAST_SEEN_VERSION_KEY, version);
+    } catch (e) {
+      /* storage unavailable - 무시 */
+    }
+  }
+
+  // 모달에 쓰는 스타일은 이 함수가 처음 호출될 때 <style>로 한 번만 주입한다
+  // (index.html/invoices.html 어느 쪽이 먼저 열려도 중복 삽입되지 않도록 id로 가드).
+  function ensureChangelogStyles() {
+    if (document.getElementById('settlement-changelog-style')) return;
+    var style = document.createElement('style');
+    style.id = 'settlement-changelog-style';
+    style.textContent =
+      '.settlement-changelog-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);' +
+      'display:flex;align-items:center;justify-content:center;padding:1rem;z-index:1000;}' +
+      '.settlement-changelog-card{background:var(--color-bg);color:var(--color-text);' +
+      'border:1px solid var(--color-border);border-radius:10px;max-width:440px;width:100%;' +
+      'max-height:85vh;overflow-y:auto;padding:1.25rem 1.25rem 1.5rem;' +
+      'box-shadow:0 10px 30px rgba(0,0,0,0.25);}' +
+      '.settlement-changelog-card h2{margin:0 0 0.9rem;font-size:1.1rem;}' +
+      '.settlement-changelog-entry{margin-bottom:1rem;}' +
+      '.settlement-changelog-entry:last-of-type{margin-bottom:1.1rem;}' +
+      '.settlement-changelog-entry h3{margin:0 0 0.5rem;font-size:0.98rem;color:var(--color-text);}' +
+      '.settlement-changelog-meta{font-size:0.78rem;color:var(--color-text-secondary);margin:0 0 0.5rem;}' +
+      '.settlement-changelog-entry ul{margin:0;padding-left:1.1rem;font-size:0.88rem;' +
+      'color:var(--color-text-secondary);line-height:1.55;}' +
+      '.settlement-changelog-entry li{margin-bottom:0.35rem;}' +
+      '.settlement-changelog-close{display:block;width:100%;border:1px solid var(--color-accent);' +
+      'background:var(--color-accent);color:#ffffff;border-radius:6px;padding:0.7rem 1rem;' +
+      'font-size:0.95rem;cursor:pointer;min-height:44px;}' +
+      '.settlement-changelog-close:hover{opacity:0.92;}';
+    document.head.appendChild(style);
+  }
+
+  // 확인하지 않은(마지막으로 본 버전 이후) changelog 항목이 있으면
+  // 커스텀 모달로 보여주고, 닫으면 최신 버전을 "확인함"으로 기록한다.
+  //
+  // 첫 방문자(저장된 값이 아예 없는 경우) 처리 방침: "새로 생긴 기능" 안내는
+  // 원래 쓰던 사용자가 다음에 왔을 때 의미가 있는 안내이므로, 한 번도 앱을
+  // 써본 적 없는 사용자에게 "계산서함이 새로 생겼어요"라고 보여주는 것은
+  // 어색하다(기준이 되는 이전 버전이 없기 때문). 따라서 첫 방문자에게는
+  // 모달을 띄우지 않고 조용히 현재 최신 버전으로 기록만 해서, 다음 업데이트
+  // 부터 정상적으로 "새로 생긴 기능" 안내를 받게 한다.
+  function showChangelogIfNeeded() {
+    var latest = getLatestVersion();
+    if (!latest) return;
+
+    var lastSeen = getLastSeenVersion();
+    if (lastSeen === null) {
+      setLastSeenVersion(latest);
+      return;
+    }
+    if (lastSeen === latest) return;
+
+    var lastSeenIndex = -1;
+    for (var i = 0; i < APP_CHANGELOG.length; i++) {
+      if (APP_CHANGELOG[i].version === lastSeen) { lastSeenIndex = i; break; }
+    }
+    // 마지막으로 본 버전을 못 찾으면(알 수 없는 값) 최신 항목 하나만 보여준다.
+    var unseen = lastSeenIndex === -1 ? [APP_CHANGELOG[0]] : APP_CHANGELOG.slice(0, lastSeenIndex);
+    if (!unseen.length) { setLastSeenVersion(latest); return; }
+
+    ensureChangelogStyles();
+
+    var overlay = document.createElement('div');
+    overlay.className = 'settlement-changelog-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', '업데이트 안내');
+
+    var card = document.createElement('div');
+    card.className = 'settlement-changelog-card';
+
+    var heading = document.createElement('h2');
+    heading.textContent = '새로운 업데이트 소식';
+    card.appendChild(heading);
+
+    unseen.forEach(function (entry) {
+      var entryEl = document.createElement('div');
+      entryEl.className = 'settlement-changelog-entry';
+
+      var title = document.createElement('h3');
+      title.textContent = entry.title;
+      entryEl.appendChild(title);
+
+      var meta = document.createElement('p');
+      meta.className = 'settlement-changelog-meta';
+      meta.textContent = 'v' + entry.version + ' · ' + entry.date;
+      entryEl.appendChild(meta);
+
+      var list = document.createElement('ul');
+      (entry.items || []).forEach(function (item) {
+        var li = document.createElement('li');
+        li.textContent = item;
+        list.appendChild(li);
+      });
+      entryEl.appendChild(list);
+
+      card.appendChild(entryEl);
+    });
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'settlement-changelog-close';
+    closeBtn.textContent = '확인';
+    card.appendChild(closeBtn);
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    function close() {
+      setLastSeenVersion(latest);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      document.removeEventListener('keydown', onKeydown);
+    }
+    function onKeydown(e) {
+      if (e.key === 'Escape') close();
+    }
+
+    closeBtn.addEventListener('click', close);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) close();
+    });
+    document.addEventListener('keydown', onKeydown);
+
+    closeBtn.focus();
+  }
+
   window.SettlementShared = {
     round: round,
     calcVat: calcVat,
@@ -239,6 +397,13 @@
     loadSavedProjects: loadSavedProjects,
     saveSavedProjects: saveSavedProjects,
     saveProjectByName: saveProjectByName,
-    getSavedProjectNames: getSavedProjectNames
+    getSavedProjectNames: getSavedProjectNames,
+
+    LAST_SEEN_VERSION_KEY: LAST_SEEN_VERSION_KEY,
+    APP_CHANGELOG: APP_CHANGELOG,
+    getLatestVersion: getLatestVersion,
+    getLastSeenVersion: getLastSeenVersion,
+    setLastSeenVersion: setLastSeenVersion,
+    showChangelogIfNeeded: showChangelogIfNeeded
   };
 })();
