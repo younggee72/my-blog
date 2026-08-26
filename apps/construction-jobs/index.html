@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>건설현장 인력풀</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <h1 class="title">건설현장 인력풀</h1>
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
+</header>
+
+<section id="guide-box" class="guide-box">
+  <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true">
+    <span id="guide-toggle-label">사용법 안내 닫기</span>
+  </button>
+  <div id="guide-content" class="guide-content">
+    <p>이 앱은 <strong>일반적인 구인구직 게시판과 반대</strong>입니다. <strong>구직자가 자기 정보를 등록</strong>하면, <strong>구인업체가 그 목록을 찾아보고 먼저 컨택</strong>하는 구조입니다.</p>
+    <ul>
+      <li><strong>구직 등록</strong> 탭: 일이 필요한 <u>구직자 본인</u>이 직종·나이·경력·희망일당 등 자기 정보를 올리는 화면입니다.</li>
+      <li><strong>인력 목록</strong> 탭: <u>구인업체(현장/공장 담당자)</u>가 등록된 구직자들을 직종·지역·나이대별로 필터링해 살펴보는 화면입니다.</li>
+      <li>데이터는 브라우저 <strong>localStorage</strong>에만 저장되며, 다른 기기·브라우저와 자동으로 동기화되지 않습니다.</li>
+      <li>구인업체와 정보를 공유하려면 <strong>내보내기(JSON)</strong>로 파일을 저장해 전달하고, 받는 쪽은 <strong>가져오기</strong>로 불러오세요.</li>
+      <li><strong>✓ 인증 인력</strong> 배지는 구직자 본인이 스스로 체크한 self-report이며, 실제 경력·자격증 서류 검증을 거친 것이 아닙니다.</li>
+    </ul>
+  </div>
+</section>
+
+<nav class="tabs" role="tablist">
+  <button id="tab-list-btn" class="tab-btn active" type="button" role="tab" aria-selected="true">인력 목록</button>
+  <button id="tab-form-btn" class="tab-btn" type="button" role="tab" aria-selected="false">구직 등록</button>
+</nav>
+
+<main class="container">
+
+  <!-- 인력 목록 화면 (구인업체가 인력을 탐색하는 화면) -->
+  <section id="tab-list" class="tab-panel">
+    <div class="filter-bar">
+      <div class="filter-field">
+        <label for="filter-jobtype">직종</label>
+        <select id="filter-jobtype"></select>
+      </div>
+      <div class="filter-field">
+        <label for="filter-region">지역</label>
+        <select id="filter-region"></select>
+      </div>
+      <div class="filter-field">
+        <label for="filter-agegroup">나이대</label>
+        <select id="filter-agegroup">
+          <option value="all">전체 나이</option>
+          <option value="age20">20대 이하</option>
+          <option value="age30">30대</option>
+          <option value="age40">40대</option>
+          <option value="age50plus">50대 이상</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filter-sort">정렬</label>
+        <select id="filter-sort">
+          <option value="latest">최신 등록순</option>
+          <option value="wage-asc">희망일당 낮은순</option>
+          <option value="wage-desc">희망일당 높은순</option>
+          <option value="available-soon">근무 가능일 임박순</option>
+        </select>
+      </div>
+    </div>
+    <p class="hint-text">※ 희망일당 정렬 기준 금액은 일당·월급 단위가 섞여 표시될 수 있습니다. 각 카드의 단위 표시를 확인하세요.</p>
+
+    <div class="io-bar">
+      <button id="export-btn" class="btn btn-secondary" type="button">내보내기 (JSON)</button>
+      <button id="import-btn" class="btn btn-secondary" type="button">가져오기 (JSON)</button>
+      <input id="import-file" type="file" accept="application/json" hidden>
+    </div>
+
+    <div id="worker-list" class="job-list"></div>
+    <p id="empty-msg" class="empty-msg" hidden></p>
+  </section>
+
+  <!-- 구직 등록 화면 (구직자 본인이 자기 정보를 올리는 화면) -->
+  <section id="tab-form" class="tab-panel" hidden>
+    <form id="worker-form" class="job-form" novalidate>
+      <div class="form-field">
+        <label for="f-jobtype">희망 직종 <span class="req">*</span></label>
+        <select id="f-jobtype" name="jobType" required></select>
+        <p class="error-msg" data-for="jobType" hidden></p>
+      </div>
+
+      <div class="form-field">
+        <label for="f-name">이름 또는 활동 별칭 <span class="req">*</span></label>
+        <input id="f-name" name="name" type="text" required maxlength="40" placeholder="예: 김OO 또는 형틀 20년차 김반장">
+        <p class="error-msg" data-for="name" hidden></p>
+      </div>
+
+      <div class="form-field form-row">
+        <div class="form-col">
+          <label for="f-age">나이(만) <span class="req">*</span></label>
+          <input id="f-age" name="age" type="number" min="14" max="99" step="1" inputmode="numeric" required placeholder="예: 45">
+        </div>
+        <div class="form-col">
+          <label for="f-career">경력/숙련도</label>
+          <select id="f-career" name="career">
+            <option value="">선택 안 함</option>
+            <option value="신입/1~3년">신입/1~3년</option>
+            <option value="3~5년">3~5년</option>
+            <option value="5~10년">5~10년</option>
+            <option value="10년 이상 숙련공">10년 이상 숙련공</option>
+          </select>
+        </div>
+      </div>
+      <p class="error-msg" data-for="age" hidden></p>
+
+      <div class="form-field">
+        <label for="f-regionmain">활동 가능 광역 지역 <span class="req">*</span></label>
+        <select id="f-regionmain" name="regionMain" required></select>
+        <p class="error-msg" data-for="regionMain" hidden></p>
+      </div>
+
+      <div class="form-field">
+        <label for="f-region">활동 가능 상세 지역</label>
+        <input id="f-region" name="region" type="text" placeholder="예: 서울 강동구">
+      </div>
+
+      <div class="form-field form-row">
+        <div class="form-col">
+          <label for="f-availablefrom">근무 가능 시작일 <span class="req">*</span></label>
+          <input id="f-availablefrom" name="availableFrom" type="date" required>
+        </div>
+        <div class="form-col">
+          <label for="f-workduration">근무 가능 기간</label>
+          <select id="f-workduration" name="workDuration">
+            <option value="">선택 안 함</option>
+            <option value="short">단기(며칠~몇 주)</option>
+            <option value="long">장기(몇 개월 이상)</option>
+          </select>
+        </div>
+      </div>
+      <p class="error-msg" data-for="availableFrom" hidden></p>
+
+      <div class="form-field form-row">
+        <div class="form-col">
+          <label for="f-wagetype">희망 급여 단위 <span class="req">*</span></label>
+          <select id="f-wagetype" name="wageType" required>
+            <option value="daily">일당</option>
+            <option value="monthly">월급</option>
+          </select>
+        </div>
+        <div class="form-col">
+          <label for="f-desiredwage">희망 금액(원) <span class="req">*</span></label>
+          <input id="f-desiredwage" name="desiredWage" type="number" min="0" step="1000" inputmode="numeric" required placeholder="예: 200000">
+        </div>
+      </div>
+      <p class="error-msg" data-for="desiredWage" hidden></p>
+      <p id="wage-guide" class="wage-guide" aria-live="polite">직종·지역·희망일당을 입력하면 이 자리에 다른 구직자들의 평균 희망일당(시세 가이드)이 표시됩니다.</p>
+
+      <div class="form-field">
+        <label for="f-contact">연락처 <span class="req">*</span></label>
+        <input id="f-contact" name="contact" type="tel" inputmode="tel" required placeholder="예: 010-1234-5678">
+        <p class="error-msg" data-for="contact" hidden></p>
+      </div>
+
+      <div class="form-field">
+        <label for="f-selfintro">자기소개 / 특이사항</label>
+        <textarea id="f-selfintro" name="selfIntro" rows="4" placeholder="보유 자격증, 사용 가능 장비, 우대사항 등"></textarea>
+      </div>
+
+      <div class="form-field form-checkbox">
+        <label for="f-verified">
+          <input id="f-verified" name="verified" type="checkbox">
+          경력 증빙 가능 / 자격증 보유 (self-report, 필수 아님)
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary">구직 등록하기</button>
+      <p id="form-toast" class="form-toast" role="status" hidden></p>
+    </form>
+  </section>
+
+</main>
+
+<!-- 상세보기 모달 -->
+<div id="modal-overlay" class="modal-overlay" hidden>
+  <div id="modal-panel" class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button id="modal-close" class="modal-close" type="button" aria-label="닫기">✕</button>
+    <div id="modal-badges" class="modal-badges"></div>
+    <h2 id="modal-title"></h2>
+    <dl id="modal-body" class="modal-body"></dl>
+
+    <div class="apply-area">
+      <button id="contact-btn" class="btn btn-primary" type="button">컨택하기</button>
+      <div id="contact-area" class="contact-area" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script src="jobs.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
