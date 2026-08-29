@@ -337,16 +337,25 @@ a {
   color: var(--color-text-secondary);
 }
 
+.install-guide-group {
+  margin-top: 1.1rem;
+}
+
+.install-guide-group h3 {
+  font-size: 0.92rem;
+  margin: 0 0 0.4rem;
+}
+
 .install-guide-list {
-  margin: 0.75rem 0 1rem;
-  padding-left: 1.1rem;
+  margin: 0;
+  padding-left: 1.3rem;
   font-size: 0.85rem;
   line-height: 1.6;
   color: var(--color-text);
 }
 
 .install-guide-list li + li {
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
 }
 
 /* ---------- 업무 도구(허브) 카드 ---------- */

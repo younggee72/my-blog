@@ -273,12 +273,42 @@
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="install-guide-title">
     <button id="install-guide-close" class="modal-close" type="button" aria-label="닫기">✕</button>
     <h2 id="install-guide-title">🖥️ 바탕화면에 설치하기</h2>
-    <p class="form-hint">이 브라우저에서는 자동 설치가 지원되지 않아요. 아래 방법으로 직접 설치해주세요.</p>
-    <ul class="install-guide-list">
-      <li><strong>Edge / Chrome (PC)</strong>: 주소창 오른쪽의 <strong>설치 아이콘(⊕ 또는 화면 모양)</strong>을 클릭하거나, 우측 상단 <strong>···(메뉴) → 앱 → 이 사이트를 앱으로 설치</strong>를 선택하세요.</li>
-      <li><strong>안드로이드 Chrome</strong>: <strong>⋮(메뉴) → 홈 화면에 추가</strong></li>
-      <li><strong>아이폰 Safari</strong>: <strong>공유 버튼 → 홈 화면에 추가</strong></li>
-    </ul>
+    <p class="form-hint">이 브라우저에서는 자동 설치 팝업이 뜨지 않아요. 아래 방법 중 하나를 그대로 따라해주세요. (한 번만 설치하면 다음부터는 바탕화면·시작메뉴 아이콘으로 바로 열립니다)</p>
+
+    <div class="install-guide-group">
+      <h3>💻 Windows — Edge</h3>
+      <ol class="install-guide-list">
+        <li>주소창(화면 위쪽, 인터넷 주소 적는 칸) 맨 오른쪽을 보면 <strong>모니터 모양 아이콘</strong>이 있는지 확인하세요. 마우스를 올리면 "이 사이트를 앱으로 설치"라고 표시됩니다.</li>
+        <li>그 아이콘이 있으면 클릭 → 팝업창에서 <strong>[설치]</strong> 버튼 클릭 → 끝!</li>
+        <li>아이콘이 안 보이면: 브라우저 <strong>오른쪽 위 점 3개(⋯)</strong> 클릭 → <strong>[앱]</strong> 메뉴 → <strong>[이 사이트를 앱으로 설치]</strong> 클릭 → <strong>[설치]</strong> 버튼 클릭</li>
+      </ol>
+    </div>
+
+    <div class="install-guide-group">
+      <h3>💻 Windows — Chrome</h3>
+      <ol class="install-guide-list">
+        <li>주소창 오른쪽 끝의 <strong>모니터 모양(⊕) 설치 아이콘</strong> 클릭 → <strong>[설치]</strong> 버튼 클릭</li>
+        <li>아이콘이 없으면: 브라우저 <strong>오른쪽 위 점 3개(⋮)</strong> 클릭 → <strong>[도구 더보기]</strong> → <strong>[바로가기 만들기...]</strong> → "창으로 열기" 체크박스 선택 → <strong>[만들기]</strong> 클릭</li>
+      </ol>
+    </div>
+
+    <div class="install-guide-group">
+      <h3>📱 안드로이드 — Chrome</h3>
+      <ol class="install-guide-list">
+        <li>오른쪽 위 <strong>점 3개(⋮)</strong> 메뉴를 누르세요.</li>
+        <li>목록에서 <strong>[앱 설치]</strong> 또는 <strong>[홈 화면에 추가]</strong>를 누르고, 나오는 팝업에서 <strong>[설치]</strong> 또는 <strong>[추가]</strong>를 누르세요.</li>
+      </ol>
+    </div>
+
+    <div class="install-guide-group">
+      <h3>📱 아이폰/아이패드 — Safari</h3>
+      <ol class="install-guide-list">
+        <li>화면 아래(또는 위) <strong>공유 아이콘(네모 안에 위쪽 화살표)</strong>을 누르세요.</li>
+        <li>메뉴를 아래로 내려 <strong>[홈 화면에 추가]</strong>를 누르세요.</li>
+        <li>오른쪽 위 <strong>[추가]</strong>를 누르면 완료됩니다.</li>
+      </ol>
+    </div>
+
     <div class="form-actions">
       <button type="button" id="install-guide-ok-btn" class="btn btn-primary">확인</button>
     </div>

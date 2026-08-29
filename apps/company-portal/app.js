@@ -427,6 +427,12 @@
   }
 
   function initInstallPrompt() {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {
+        // 서비스워커 등록 실패 시에도 앱 동작에는 영향 없음(설치 안내 모달로 폴백)
+      });
+    }
+
     window.addEventListener('beforeinstallprompt', (event) => {
       event.preventDefault();
       deferredInstallPrompt = event;
