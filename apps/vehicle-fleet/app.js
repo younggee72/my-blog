@@ -48,6 +48,7 @@
   const vehicleModelInput = document.getElementById('vehicle-model');
   const vehicleDriverInput = document.getElementById('vehicle-driver');
   const vehicleFirstRegisteredInput = document.getElementById('vehicle-first-registered');
+  const vehicleOdometerLabel = document.getElementById('vehicle-odometer-label');
   const vehicleOdometerInput = document.getElementById('vehicle-odometer');
   const vehicleOdometerHint = document.getElementById('vehicle-odometer-hint');
   const vehicleNoteInput = document.getElementById('vehicle-note');
@@ -89,8 +90,11 @@
   const consumableCustomLabelField = document.getElementById('consumable-customlabel-field');
   const consumableCustomLabelInput = document.getElementById('consumable-customlabel');
   const consumableLastDateInput = document.getElementById('consumable-lastdate');
+  const consumableLastOdometerLabel = document.getElementById('consumable-lastodometer-label');
   const consumableLastOdometerInput = document.getElementById('consumable-lastodometer');
+  const consumableCycleHint = document.getElementById('consumable-cycle-hint');
   const consumableCycleMonthsInput = document.getElementById('consumable-cyclemonths');
+  const consumableCycleKmLabel = document.getElementById('consumable-cyclekm-label');
   const consumableCycleKmInput = document.getElementById('consumable-cyclekm');
   const consumableNoteInput = document.getElementById('consumable-note');
   const consumableFormCancelBtn = document.getElementById('consumable-form-cancel');
@@ -125,6 +129,10 @@
 
   function formatKm(n) {
     return Number(n).toLocaleString('ko-KR') + 'km';
+  }
+
+  function formatUsage(n, unit) {
+    return Number(n).toLocaleString('ko-KR') + (unit || 'km');
   }
 
   function statusBadgeHtml(status) {
@@ -213,7 +221,8 @@
 
   function renderVehicleCard(vehicle) {
     const typeInfo = getVehicleType(vehicle.vehicleType);
-    const status = getVehicleWorstStatus(vehicle.id, schedules, consumables, vehicle.currentOdometer);
+    const usage = getUsageInfo(vehicle.vehicleType);
+    const status = getVehicleWorstStatus(vehicle.id, schedules, consumables, vehicle.currentOdometer, undefined, usage.dueSoonQty);
 
     const card = document.createElement('button');
     card.type = 'button';
@@ -273,6 +282,7 @@
       return;
     }
     const typeInfo = getVehicleType(vehicle.vehicleType);
+    const usage = getUsageInfo(vehicle.vehicleType);
     detailPlateEl.textContent = `${typeInfo ? typeInfo.icon + ' ' : ''}${vehicle.plateNumber}`;
 
     const metaParts = [
@@ -280,7 +290,7 @@
       `담당자: ${vehicle.driver || '미지정'}`,
       `모델: ${vehicle.modelName || '-'}`,
       `최초등록일: ${vehicle.firstRegisteredDate || '미입력'}`,
-      vehicle.currentOdometer != null ? `현재 ${formatKm(vehicle.currentOdometer)}` : '주행거리 미입력',
+      vehicle.currentOdometer != null ? `현재 ${usage.label} ${formatUsage(vehicle.currentOdometer, usage.unit)}` : `${usage.label} 미입력`,
     ];
     detailMetaEl.textContent = metaParts.join(' · ');
 
@@ -348,21 +358,22 @@
     }
     consumableEmptyMsgEl.hidden = true;
 
+    const usage = getUsageInfo(vehicle.vehicleType);
     const frag = document.createDocumentFragment();
     items.forEach((c) => {
-      const status = getItemStatus(c, vehicle.currentOdometer);
+      const status = getItemStatus(c, vehicle.currentOdometer, undefined, usage.dueSoonQty);
       const dueDate = getNextDueDate(c);
       const kmRemaining = getKmRemaining(c, vehicle.currentOdometer);
       const typeInfo = getConsumableType(c.itemType);
       const label = c.itemType === 'etc' ? (c.customLabel || '기타 소모품') : (typeInfo ? typeInfo.label : c.itemType);
       const cycleParts = [];
       if (c.cycleMonths) cycleParts.push(`${c.cycleMonths}개월`);
-      if (c.cycleKm) cycleParts.push(`${Number(c.cycleKm).toLocaleString('ko-KR')}km`);
+      if (c.cycleKm) cycleParts.push(`${Number(c.cycleKm).toLocaleString('ko-KR')}${usage.unit}`);
       const cycleText = cycleParts.length ? cycleParts.join(' / ') : '미입력';
 
       const dueParts = [];
       if (dueDate) dueParts.push(`날짜: ${dueDate}`);
-      if (kmRemaining != null) dueParts.push(`잔여 ${Number(kmRemaining).toLocaleString('ko-KR')}km`);
+      if (kmRemaining != null) dueParts.push(`잔여 ${Number(kmRemaining).toLocaleString('ko-KR')}${usage.unit}`);
       const dueText = dueParts.length ? dueParts.join(' · ') : '계산 불가';
 
       const card = document.createElement('div');
@@ -374,7 +385,7 @@
           ${statusBadgeHtml(status)}
         </div>
         <div class="item-card-meta">
-          <span>마지막 교환: ${c.lastChangeDate || '미입력'}${c.lastChangeOdometer != null ? ` (${formatKm(c.lastChangeOdometer)})` : ''}</span>
+          <span>마지막 교환: ${c.lastChangeDate || '미입력'}${c.lastChangeOdometer != null ? ` (${formatUsage(c.lastChangeOdometer, usage.unit)})` : ''}</span>
           <span>교환주기: ${cycleText}</span>
           <span>다음 교환: ${dueText}</span>
           ${c.note ? `<span>비고: ${escapeHtml(c.note)}</span>` : ''}
@@ -391,7 +402,7 @@
               <input type="date" id="complete-date-${c.id}" value="${todayISO()}">
             </div>
             <div class="form-field">
-              <label for="complete-odo-${c.id}">현재 주행거리(km)</label>
+              <label for="complete-odo-${c.id}">현재 ${usage.label}(${usage.unit})</label>
               <input type="number" id="complete-odo-${c.id}" min="0" step="1" inputmode="numeric" placeholder="선택 입력">
             </div>
           </div>
@@ -409,8 +420,13 @@
   // ---------- 차량 등록/수정 폼 ----------
 
   function updateOdometerHint() {
-    const typeInfo = getVehicleType(vehicleTypeSelect.value);
-    const isNonRoad = typeInfo && typeInfo.isRoadVehicle === false;
+    const usage = getUsageInfo(vehicleTypeSelect.value);
+    const isNonRoad = usage.key === 'hour';
+    vehicleOdometerLabel.textContent = `현재 ${usage.label}(${usage.unit})`;
+    vehicleOdometerInput.placeholder = isNonRoad ? '예: 3200' : '예: 82000';
+    vehicleOdometerHint.textContent = isNonRoad
+      ? '이 차종은 도로 주행이 없는 중장비라 가동시간(시간) 기준으로 관리합니다.'
+      : '';
     vehicleOdometerHint.hidden = !isNonRoad;
   }
 
@@ -494,9 +510,13 @@
 
         if (vehicleAutoConsumablesCheckbox.checked) {
           const typeInfo = getVehicleType(type);
+          const usage = getUsageInfo(type);
           if (typeInfo) {
             typeInfo.defaultConsumables.forEach((itemType) => {
               const cTypeInfo = getConsumableType(itemType);
+              const defaultCycle = cTypeInfo
+                ? (usage.key === 'hour' ? cTypeInfo.defaultCycleHours : cTypeInfo.defaultCycleKm)
+                : null;
               consumables.push({
                 id: generateId('c'),
                 vehicleId: newVehicle.id,
@@ -505,7 +525,7 @@
                 lastChangeDate: '',
                 lastChangeOdometer: null,
                 cycleMonths: cTypeInfo ? cTypeInfo.defaultCycleMonths : null,
-                cycleKm: cTypeInfo ? cTypeInfo.defaultCycleKm : null,
+                cycleKm: defaultCycle,
                 note: '',
               });
             });
@@ -721,6 +741,16 @@
     consumableCustomLabelField.hidden = consumableItemTypeSelect.value !== 'etc';
   }
 
+  function updateConsumableUsageLabels() {
+    const vehicle = vehicles.find((v) => v.id === currentDetailVehicleId);
+    const usage = getUsageInfo(vehicle ? vehicle.vehicleType : null);
+    consumableLastOdometerLabel.textContent = `마지막 교환 시 ${usage.label}(${usage.unit})`;
+    consumableLastOdometerInput.placeholder = usage.key === 'hour' ? '예: 2950' : '예: 78000';
+    consumableCycleKmLabel.textContent = `교환주기(${usage.unit})`;
+    consumableCycleKmInput.placeholder = usage.key === 'hour' ? '예: 250' : '예: 10000';
+    consumableCycleHint.innerHTML = `교환주기는 개월과 ${usage.unit} 중 <strong>하나 이상</strong> 입력해주세요.`;
+  }
+
   function openConsumableForm(consumableId) {
     const editing = !!consumableId;
     consumableFormTitle.textContent = editing ? '소모품 항목 수정' : '소모품 항목 추가';
@@ -743,6 +773,7 @@
     }
 
     updateConsumableCustomLabelField();
+    updateConsumableUsageLabels();
     consumableFormPanel.hidden = false;
     consumableFormPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

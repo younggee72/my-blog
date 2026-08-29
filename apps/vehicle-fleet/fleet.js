@@ -5,30 +5,43 @@
 
 const DUE_SOON_DAYS = 30;
 const DUE_SOON_KM = 1000;
+const DUE_SOON_HOURS = 50;
+
+// 차량 유형별 "주행 실적" 단위 — 도로 주행 차량은 km, 중장비는 가동시간(시간)으로 관리한다.
+const USAGE_UNITS = {
+  km: { key: 'km', label: '주행거리', unit: 'km', dueSoonQty: DUE_SOON_KM },
+  hour: { key: 'hour', label: '가동시간', unit: '시간', dueSoonQty: DUE_SOON_HOURS },
+};
+
+function getUsageInfo(vehicleTypeId) {
+  const t = getVehicleType(vehicleTypeId);
+  const unitKey = (t && t.usageUnit) || 'km';
+  return USAGE_UNITS[unitKey] || USAGE_UNITS.km;
+}
 
 const VEHICLE_TYPES = [
-  { id: 'porter', label: '포터(트럭)', icon: '🚚', isRoadVehicle: true,
+  { id: 'porter', label: '포터(트럭)', icon: '🚚', isRoadVehicle: true, usageUnit: 'km',
     inspectionLabel: '자동차 정기검사', defaultInspectionCycleMonths: 12,
     defaultConsumables: ['engine_oil', 'mission_oil', 'air_filter', 'oil_filter', 'tire'] },
-  { id: 'dump', label: '2.5톤 덤프트럭', icon: '🚛', isRoadVehicle: true,
+  { id: 'dump', label: '2.5톤 덤프트럭', icon: '🚛', isRoadVehicle: true, usageUnit: 'km',
     inspectionLabel: '자동차 정기검사', defaultInspectionCycleMonths: 6,
     defaultConsumables: ['engine_oil', 'mission_oil', 'air_filter', 'oil_filter', 'tire'] },
-  { id: 'excavator', label: '포크레인(굴착기)', icon: '🚜', isRoadVehicle: false,
+  { id: 'excavator', label: '포크레인(굴착기)', icon: '🚜', isRoadVehicle: false, usageUnit: 'hour',
     inspectionLabel: '건설기계 정기검사', defaultInspectionCycleMonths: 12,
     defaultConsumables: ['engine_oil', 'hydraulic_oil', 'oil_filter'] },
-  { id: 'car', label: '승용차', icon: '🚗', isRoadVehicle: true,
+  { id: 'car', label: '승용차', icon: '🚗', isRoadVehicle: true, usageUnit: 'km',
     inspectionLabel: '자동차 정기검사', defaultInspectionCycleMonths: 24,
     defaultConsumables: ['engine_oil', 'mission_oil', 'air_filter', 'oil_filter', 'tire'] },
 ];
 
 const CONSUMABLE_TYPES = [
-  { id: 'engine_oil', label: '엔진오일', unit: 'km', defaultCycleMonths: 6, defaultCycleKm: 10000 },
-  { id: 'mission_oil', label: '미션오일(변속기오일)', unit: 'km', defaultCycleMonths: 24, defaultCycleKm: 40000 },
-  { id: 'hydraulic_oil', label: '유압오일', unit: 'km', defaultCycleMonths: 12, defaultCycleKm: null },
-  { id: 'air_filter', label: '에어필터', unit: 'km', defaultCycleMonths: 12, defaultCycleKm: 20000 },
-  { id: 'oil_filter', label: '오일필터', unit: 'km', defaultCycleMonths: 6, defaultCycleKm: 10000 },
-  { id: 'tire', label: '타이어', unit: 'km', defaultCycleMonths: 36, defaultCycleKm: 50000 },
-  { id: 'etc', label: '기타 소모품', unit: 'km', defaultCycleMonths: null, defaultCycleKm: null },
+  { id: 'engine_oil', label: '엔진오일', unit: 'km', defaultCycleMonths: 6, defaultCycleKm: 10000, defaultCycleHours: 250 },
+  { id: 'mission_oil', label: '미션오일(변속기오일)', unit: 'km', defaultCycleMonths: 24, defaultCycleKm: 40000, defaultCycleHours: null },
+  { id: 'hydraulic_oil', label: '유압오일', unit: 'km', defaultCycleMonths: 12, defaultCycleKm: null, defaultCycleHours: 1000 },
+  { id: 'air_filter', label: '에어필터', unit: 'km', defaultCycleMonths: 12, defaultCycleKm: 20000, defaultCycleHours: 250 },
+  { id: 'oil_filter', label: '오일필터', unit: 'km', defaultCycleMonths: 6, defaultCycleKm: 10000, defaultCycleHours: 250 },
+  { id: 'tire', label: '타이어', unit: 'km', defaultCycleMonths: 36, defaultCycleKm: 50000, defaultCycleHours: null },
+  { id: 'etc', label: '기타 소모품', unit: 'km', defaultCycleMonths: null, defaultCycleKm: null, defaultCycleHours: null },
 ];
 
 const INSURANCE_LABEL_PRESETS = ['자동차보험', '건설기계보험', '화물자동차보험'];
@@ -144,8 +157,9 @@ function getKmRemaining(item, currentOdometer) {
   return (item.lastChangeOdometer + item.cycleKm) - currentOdometer;
 }
 
-function getItemStatus(item, currentOdometer, today) {
+function getItemStatus(item, currentOdometer, today, dueSoonQty) {
   today = today || new Date();
+  dueSoonQty = dueSoonQty == null ? DUE_SOON_KM : dueSoonQty;
   const dueDate = getNextDueDate(item);
   const kmRemaining = getKmRemaining(item, currentOdometer);
   const results = [];
@@ -155,7 +169,7 @@ function getItemStatus(item, currentOdometer, today) {
     results.push(daysLeft < 0 ? 'overdue' : daysLeft <= DUE_SOON_DAYS ? 'due-soon' : 'ok');
   }
   if (kmRemaining != null) {
-    results.push(kmRemaining < 0 ? 'overdue' : kmRemaining <= DUE_SOON_KM ? 'due-soon' : 'ok');
+    results.push(kmRemaining < 0 ? 'overdue' : kmRemaining <= dueSoonQty ? 'due-soon' : 'ok');
   }
   if (results.length === 0) return 'unknown';
   if (results.includes('overdue')) return 'overdue';
@@ -164,14 +178,14 @@ function getItemStatus(item, currentOdometer, today) {
 }
 
 // 차량 한 대의 카드에 표시할 "가장 급한 상태"(경과 > 임박 > 정상, unknown은 무시)
-function getVehicleWorstStatus(vehicleId, schedules, consumables, currentOdometer, today) {
+function getVehicleWorstStatus(vehicleId, schedules, consumables, currentOdometer, today, dueSoonQty) {
   const items = [
     ...schedules.filter((s) => s.vehicleId === vehicleId),
     ...consumables.filter((c) => c.vehicleId === vehicleId),
   ];
   let worst = 'ok';
   items.forEach((item) => {
-    const status = getItemStatus(item, currentOdometer, today);
+    const status = getItemStatus(item, currentOdometer, today, dueSoonQty);
     if (status === 'overdue') worst = 'overdue';
     else if (status === 'due-soon' && worst !== 'overdue') worst = 'due-soon';
   });
@@ -193,7 +207,7 @@ function getFleetSummary(vehicles, schedules, consumables, today) {
   schedules.forEach((s) => {
     const vehicle = vehicleById.get(s.vehicleId);
     if (!vehicle) return;
-    const status = getItemStatus(s, vehicle.currentOdometer, today);
+    const status = getItemStatus(s, vehicle.currentOdometer, today, getUsageInfo(vehicle.vehicleType).dueSoonQty);
     if (status === 'overdue') summary.scheduleOverdue += 1;
     else if (status === 'due-soon') summary.scheduleDueSoon += 1;
   });
@@ -201,7 +215,7 @@ function getFleetSummary(vehicles, schedules, consumables, today) {
   consumables.forEach((c) => {
     const vehicle = vehicleById.get(c.vehicleId);
     if (!vehicle) return;
-    const status = getItemStatus(c, vehicle.currentOdometer, today);
+    const status = getItemStatus(c, vehicle.currentOdometer, today, getUsageInfo(vehicle.vehicleType).dueSoonQty);
     if (status === 'overdue') summary.consumableOverdue += 1;
     else if (status === 'due-soon') summary.consumableDueSoon += 1;
   });
@@ -259,7 +273,7 @@ function getNotifyTargets(vehicles, schedules, consumables, notifyLog, today) {
   schedules.forEach((s) => {
     const vehicle = vehicleById.get(s.vehicleId);
     if (!vehicle) return;
-    const status = getItemStatus(s, vehicle.currentOdometer, today);
+    const status = getItemStatus(s, vehicle.currentOdometer, today, getUsageInfo(vehicle.vehicleType).dueSoonQty);
     if (status !== 'overdue' && status !== 'due-soon') return;
     const key = `schedule:${s.id}`;
     if (notifyLog[key] === todayStr) return;
@@ -278,7 +292,7 @@ function getNotifyTargets(vehicles, schedules, consumables, notifyLog, today) {
   consumables.forEach((c) => {
     const vehicle = vehicleById.get(c.vehicleId);
     if (!vehicle) return;
-    const status = getItemStatus(c, vehicle.currentOdometer, today);
+    const status = getItemStatus(c, vehicle.currentOdometer, today, getUsageInfo(vehicle.vehicleType).dueSoonQty);
     if (status !== 'overdue' && status !== 'due-soon') return;
     const key = `consumable:${c.id}`;
     if (notifyLog[key] === todayStr) return;
@@ -351,7 +365,7 @@ const SEED_VEHICLES = [
   { id: 'v-porter-5', plateNumber: '12가 1005', vehicleType: 'porter', modelName: '포터2 슈퍼캡', driver: '정다은', note: '', currentOdometer: 98000, firstRegisteredDate: '2023-08-20', createdAt: '2023-09-05T09:00:00.000Z' },
   { id: 'v-porter-6', plateNumber: '12가 1006', vehicleType: 'porter', modelName: '포터2 초장축', driver: '강태현', note: '신차 교체분', currentOdometer: 30000, firstRegisteredDate: '2025-01-05', createdAt: '2025-01-15T09:00:00.000Z' },
   { id: 'v-dump-1', plateNumber: '34나 2001', vehicleType: 'dump', modelName: '2.5톤 덤프', driver: '오준영', note: '사업용(화물)', currentOdometer: 150000, firstRegisteredDate: '2022-04-10', createdAt: '2022-05-01T09:00:00.000Z' },
-  { id: 'v-excavator-1', plateNumber: '포크레인 1호기', vehicleType: 'excavator', modelName: '0.6㎥급 굴착기', driver: '한도현', note: '가동시간 기준 관리(주행거리 미입력)', currentOdometer: null, firstRegisteredDate: '2022-07-25', createdAt: '2022-08-10T09:00:00.000Z' },
+  { id: 'v-excavator-1', plateNumber: '포크레인 1호기', vehicleType: 'excavator', modelName: '0.6㎥급 굴착기', driver: '한도현', note: '가동시간 기준 관리', currentOdometer: 3200, firstRegisteredDate: '2022-07-25', createdAt: '2022-08-10T09:00:00.000Z' },
   { id: 'v-car-1', plateNumber: '12가 9001', vehicleType: 'car', modelName: '쏘나타', driver: '대표이사', note: '업무용 승용차', currentOdometer: 20000, firstRegisteredDate: '2024-02-15', createdAt: '2024-03-01T09:00:00.000Z' },
 ];
 
@@ -411,9 +425,9 @@ const SEED_CONSUMABLES = [
   { id: 'c-16', vehicleId: 'v-dump-1', itemType: 'oil_filter', customLabel: '', lastChangeDate: '2026-05-01', lastChangeOdometer: 145000, cycleMonths: 6, cycleKm: 10000, note: '' },
   { id: 'c-17', vehicleId: 'v-dump-1', itemType: 'tire', customLabel: '', lastChangeDate: '2024-08-01', lastChangeOdometer: 90000, cycleMonths: 36, cycleKm: 50000, note: '' },
   // 포크레인1 — 주행거리 미입력, 엔진오일 경과(날짜 기준만 적용)
-  { id: 'c-18', vehicleId: 'v-excavator-1', itemType: 'engine_oil', customLabel: '', lastChangeDate: '2026-02-01', lastChangeOdometer: null, cycleMonths: 6, cycleKm: null, note: '가동시간 기준 관리, km 미입력' },
-  { id: 'c-19', vehicleId: 'v-excavator-1', itemType: 'hydraulic_oil', customLabel: '', lastChangeDate: '2026-06-01', lastChangeOdometer: null, cycleMonths: 12, cycleKm: null, note: '' },
-  { id: 'c-20', vehicleId: 'v-excavator-1', itemType: 'oil_filter', customLabel: '', lastChangeDate: '2026-07-01', lastChangeOdometer: null, cycleMonths: 6, cycleKm: null, note: '' },
+  { id: 'c-18', vehicleId: 'v-excavator-1', itemType: 'engine_oil', customLabel: '', lastChangeDate: '2026-02-01', lastChangeOdometer: 2950, cycleMonths: 6, cycleKm: 250, note: '가동시간(시간) 기준 관리' },
+  { id: 'c-19', vehicleId: 'v-excavator-1', itemType: 'hydraulic_oil', customLabel: '', lastChangeDate: '2026-06-01', lastChangeOdometer: 2400, cycleMonths: 12, cycleKm: 1000, note: '' },
+  { id: 'c-20', vehicleId: 'v-excavator-1', itemType: 'oil_filter', customLabel: '', lastChangeDate: '2026-07-01', lastChangeOdometer: 2950, cycleMonths: 6, cycleKm: 250, note: '' },
   // 승용차1 — 타이어 경과
   { id: 'c-21', vehicleId: 'v-car-1', itemType: 'engine_oil', customLabel: '', lastChangeDate: '2026-06-01', lastChangeOdometer: 17000, cycleMonths: 6, cycleKm: 10000, note: '' },
   { id: 'c-22', vehicleId: 'v-car-1', itemType: 'mission_oil', customLabel: '', lastChangeDate: '2025-06-01', lastChangeOdometer: 10000, cycleMonths: 24, cycleKm: 40000, note: '' },
