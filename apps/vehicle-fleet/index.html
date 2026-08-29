@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>법인차량 관리</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <h1 class="title">🚚 법인차량 관리</h1>
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
+</header>
+
+<section id="guide-box" class="guide-box">
+  <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true">
+    <span id="guide-toggle-label">사용법 안내 닫기</span>
+  </button>
+  <div id="guide-content" class="guide-content">
+    <ul>
+      <li>데이터는 <strong>이 브라우저에만 저장</strong>되며(localStorage), 다른 기기와 자동 동기화되지 않습니다. 여러 기기·담당자와 데이터를 공유하려면 <strong>내보내기(JSON)</strong>로 파일을 저장해 전달하고, 받는 쪽은 <strong>가져오기</strong>로 불러오세요.</li>
+      <li>대시보드 상단 요약 배지는 <strong>검사/보험</strong>과 <strong>소모품</strong>의 임박·경과 건수를 각각 보여줍니다. 임박 기준은 <strong>만기 30일 전 또는 잔여 주행거리 1000km 이내</strong>입니다.</li>
+      <li>처음 실행 시 채워져 있는 차량번호·담당자 등은 <strong>예시(더미) 데이터</strong>입니다. 실제 값으로 직접 수정해서 사용하세요.</li>
+      <li>포터/덤프/승용차는 <strong>자동차 정기검사</strong> 대상이고, 포크레인(굴착기)처럼 도로 주행이 없는 중장비는 <strong>건설기계 정기검사</strong> 대상이라 항목명이 다르게 표시됩니다.</li>
+      <li><strong>🔔 알림 설정</strong>에서 웹훅 URL을 등록하고 켜면, 정해진 시각이 아니라 <strong>담당자가 앱을 여는 시점마다</strong> 그때 기준 임박/경과 항목을 계산해 등록한 웹훅 주소로 전송합니다. 같은 항목은 하루에 한 번만 전송됩니다.</li>
+      <li>카카오톡/문자로 알림을 받고 싶다면, 슬랙·디스코드 웹훅 URL이 아니라 <strong>카카오톡 "나에게 보내기" API·문자 발송 API 등 직접 그 메시지를 대신 보내주는 웹훅 서비스</strong>에서 발급받은 URL을 입력해야 합니다. 이 앱이 카카오톡/문자를 직접 보내지는 않습니다.</li>
+    </ul>
+  </div>
+</section>
+
+<main class="container">
+
+  <!-- ================= 대시보드 화면 ================= -->
+  <section id="screen-dashboard" class="screen">
+    <div id="summary-bar" class="summary-bar"></div>
+
+    <div class="action-bar">
+      <button id="add-vehicle-btn" class="btn btn-primary" type="button">+ 차량 등록</button>
+      <button id="export-btn" class="btn btn-secondary" type="button">내보내기(JSON)</button>
+      <button id="import-btn" class="btn btn-secondary" type="button">가져오기(JSON)</button>
+      <input id="import-file" type="file" accept="application/json" hidden>
+      <button id="notify-settings-btn" class="btn btn-secondary" type="button">🔔 알림 설정<span id="notify-off-dot" class="notify-off-dot"></span></button>
+    </div>
+
+    <div id="vehicle-list" class="vehicle-grid"></div>
+    <p id="dashboard-empty-msg" class="empty-msg" hidden>등록된 차량이 없습니다. "+ 차량 등록" 버튼으로 첫 차량을 등록해보세요.</p>
+  </section>
+
+  <!-- ================= 차량 상세 화면 ================= -->
+  <section id="screen-detail" class="screen" hidden>
+    <button id="back-to-dashboard" class="back-link" type="button">← 대시보드로</button>
+
+    <div class="detail-header">
+      <div class="detail-header-info">
+        <h2 id="detail-plate"></h2>
+        <div id="detail-meta" class="detail-header-meta"></div>
+      </div>
+      <div class="detail-header-actions">
+        <button id="detail-edit-btn" class="btn btn-secondary" type="button">수정</button>
+        <button id="detail-delete-btn" class="btn btn-danger" type="button">삭제</button>
+      </div>
+    </div>
+    <p id="detail-note" class="detail-note" hidden></p>
+
+    <!-- 검사/보험 섹션 -->
+    <div class="section-block">
+      <div class="section-block-head">
+        <h3>검사 / 보험</h3>
+        <button id="add-schedule-btn" class="btn btn-secondary" type="button">+ 항목 추가</button>
+      </div>
+
+      <div id="schedule-form-panel" class="form-panel" hidden>
+        <h3 id="schedule-form-title">검사/보험 항목 추가</h3>
+        <form id="schedule-form" class="form-grid" novalidate>
+          <input type="hidden" id="schedule-id">
+
+          <div class="form-field">
+            <label for="schedule-category">구분 <span class="req">*</span></label>
+            <select id="schedule-category" required>
+              <option value="inspection">정기검사</option>
+              <option value="insurance">보험</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="schedule-label">항목명 <span class="req">*</span></label>
+            <input id="schedule-label" type="text" list="insurance-presets" required maxlength="30" placeholder="정기검사는 차종에 맞춰 자동 입력됩니다">
+            <datalist id="insurance-presets"></datalist>
+            <p class="error-msg" data-for="label" hidden></p>
+          </div>
+
+          <div class="form-field">
+            <label for="schedule-lastdate">마지막 일자 <span class="req">*</span></label>
+            <input id="schedule-lastdate" type="date" required>
+            <p class="error-msg" data-for="lastdate" hidden></p>
+          </div>
+
+          <div class="form-field form-checkbox">
+            <label for="schedule-override-toggle">
+              <input id="schedule-override-toggle" type="checkbox">
+              다음 예정일 직접 입력 (주기 대신 날짜를 바로 지정)
+            </label>
+          </div>
+
+          <div class="form-field" id="schedule-cyclemonths-field">
+            <label for="schedule-cyclemonths">주기(개월) <span class="req">*</span></label>
+            <input id="schedule-cyclemonths" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 12">
+          </div>
+
+          <div class="form-field" id="schedule-nextdate-field" hidden>
+            <label for="schedule-nextdate">다음 예정일 <span class="req">*</span></label>
+            <input id="schedule-nextdate" type="date">
+          </div>
+          <p class="error-msg" data-for="cycle" hidden></p>
+
+          <div class="form-field">
+            <label for="schedule-note">비고</label>
+            <textarea id="schedule-note" rows="2"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">저장</button>
+            <button type="button" id="schedule-form-cancel" class="btn btn-secondary">취소</button>
+          </div>
+          <p id="schedule-form-toast" class="form-toast" role="status" hidden></p>
+        </form>
+      </div>
+
+      <div id="schedule-list" class="item-list"></div>
+      <p id="schedule-empty-msg" class="empty-msg" hidden>등록된 검사/보험 항목이 없습니다.</p>
+    </div>
+
+    <!-- 소모품 섹션 -->
+    <div class="section-block">
+      <div class="section-block-head">
+        <h3>소모품</h3>
+        <button id="add-consumable-btn" class="btn btn-secondary" type="button">+ 항목 추가</button>
+      </div>
+
+      <div id="consumable-form-panel" class="form-panel" hidden>
+        <h3 id="consumable-form-title">소모품 항목 추가</h3>
+        <form id="consumable-form" class="form-grid" novalidate>
+          <input type="hidden" id="consumable-id">
+
+          <div class="form-field">
+            <label for="consumable-itemtype">종류 <span class="req">*</span></label>
+            <select id="consumable-itemtype" required></select>
+          </div>
+
+          <div class="form-field" id="consumable-customlabel-field" hidden>
+            <label for="consumable-customlabel">항목명 <span class="req">*</span></label>
+            <input id="consumable-customlabel" type="text" maxlength="30" placeholder="예: 배터리, 브레이크패드">
+            <p class="error-msg" data-for="customlabel" hidden></p>
+          </div>
+
+          <div class="form-field">
+            <label for="consumable-lastdate">마지막 교환일 <span class="req">*</span></label>
+            <input id="consumable-lastdate" type="date" required>
+            <p class="error-msg" data-for="lastdate" hidden></p>
+          </div>
+
+          <div class="form-field">
+            <label for="consumable-lastodometer">마지막 교환 시 주행거리(km)</label>
+            <input id="consumable-lastodometer" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 78000">
+          </div>
+
+          <p class="form-hint">교환주기는 개월과 km 중 <strong>하나 이상</strong> 입력해주세요.</p>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="consumable-cyclemonths">교환주기(개월)</label>
+              <input id="consumable-cyclemonths" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 6">
+            </div>
+            <div class="form-field">
+              <label for="consumable-cyclekm">교환주기(km)</label>
+              <input id="consumable-cyclekm" type="number" min="1" step="100" inputmode="numeric" placeholder="예: 10000">
+            </div>
+          </div>
+          <p class="error-msg" data-for="cycle" hidden></p>
+
+          <div class="form-field">
+            <label for="consumable-note">비고</label>
+            <textarea id="consumable-note" rows="2"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">저장</button>
+            <button type="button" id="consumable-form-cancel" class="btn btn-secondary">취소</button>
+          </div>
+          <p id="consumable-form-toast" class="form-toast" role="status" hidden></p>
+        </form>
+      </div>
+
+      <div id="consumable-list" class="item-list"></div>
+      <p id="consumable-empty-msg" class="empty-msg" hidden>등록된 소모품 항목이 없습니다.</p>
+    </div>
+  </section>
+
+  <!-- 차량 등록/수정 폼: 대시보드·상세 화면 어느 쪽에서 열어도 현재 화면 아래에 표시된다 -->
+  <div id="vehicle-form-panel" class="form-panel" hidden>
+    <h3 id="vehicle-form-title">차량 등록</h3>
+    <form id="vehicle-form" class="form-grid" novalidate>
+      <input type="hidden" id="vehicle-id">
+
+      <div class="form-field">
+        <label for="vehicle-plate">차량번호(식별명) <span class="req">*</span></label>
+        <input id="vehicle-plate" type="text" required placeholder="예: 12가 1001 또는 포크레인 1호기" maxlength="30">
+        <p class="error-msg" data-for="plate" hidden></p>
+      </div>
+
+      <div class="form-field">
+        <label for="vehicle-type">차종 <span class="req">*</span></label>
+        <select id="vehicle-type" required></select>
+        <p class="error-msg" data-for="type" hidden></p>
+      </div>
+
+      <div class="form-row">
+        <div class="form-field">
+          <label for="vehicle-model">모델명</label>
+          <input id="vehicle-model" type="text" placeholder="예: 포터2 초장축">
+        </div>
+        <div class="form-field">
+          <label for="vehicle-driver">담당자/운전자</label>
+          <input id="vehicle-driver" type="text" placeholder="예: 김민수">
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label for="vehicle-odometer" id="vehicle-odometer-label">현재 주행거리(km)</label>
+        <input id="vehicle-odometer" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 82000">
+        <p id="vehicle-odometer-hint" class="form-hint" hidden>이 차종은 도로 주행이 없는 중장비입니다. 가동시간 기준으로 별도 관리하며, km 입력은 생략할 수 있습니다.</p>
+      </div>
+
+      <div class="form-field">
+        <label for="vehicle-note">비고</label>
+        <textarea id="vehicle-note" rows="2" placeholder="예: 자재 운반 전담"></textarea>
+      </div>
+
+      <div class="form-field form-checkbox" id="vehicle-auto-consumables-field">
+        <label for="vehicle-auto-consumables">
+          <input id="vehicle-auto-consumables" type="checkbox" checked>
+          이 차종의 기본 소모품 항목을 자동으로 추가 (신규 등록 시에만 적용)
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">저장</button>
+        <button type="button" id="vehicle-form-cancel" class="btn btn-secondary">취소</button>
+      </div>
+      <p id="vehicle-form-toast" class="form-toast" role="status" hidden></p>
+    </form>
+  </div>
+
+</main>
+
+<!-- 알림 설정 모달 -->
+<div id="notify-modal-overlay" class="modal-overlay" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="notify-modal-title">
+    <button id="notify-modal-close" class="modal-close" type="button" aria-label="닫기">✕</button>
+    <h2 id="notify-modal-title">🔔 알림 설정</h2>
+
+    <div class="form-grid">
+      <div class="form-field">
+        <label for="notify-webhook-url">웹훅 URL</label>
+        <input id="notify-webhook-url" type="url" placeholder="슬랙/디스코드 웹훅 URL 또는 발급받은 알림 엔드포인트">
+      </div>
+
+      <div class="form-field form-checkbox">
+        <label for="notify-enabled">
+          <input id="notify-enabled" type="checkbox">
+          알림 켜기 (앱을 열 때마다 그 시점 기준 임박/경과 항목을 전송)
+        </label>
+      </div>
+      <p id="notify-url-warning" class="error-msg" hidden>URL을 입력해야 알림이 켜집니다.</p>
+
+      <div class="form-actions">
+        <button id="notify-test-btn" class="btn btn-secondary" type="button">테스트 전송</button>
+        <button id="notify-save-btn" class="btn btn-primary" type="button">저장</button>
+      </div>
+      <p id="notify-test-result" class="notify-test-result" role="status" hidden></p>
+      <p id="notify-fail-note" class="notify-fail-note" hidden></p>
+    </div>
+
+    <p class="modal-hint">이 URL은 이 브라우저에만 저장되며 외부로 전송되지 않습니다(알림 전송 시 등록한 웹훅 서버로만 전달됩니다). 카카오톡/문자로 받고 싶다면 슬랙·디스코드 웹훅 URL이 아니라, 그런 메시지를 대신 보내주는 웹훅 서비스(카카오톡 "나에게 보내기" API, 문자 발송 API 등)에서 발급받은 URL을 입력하세요. 이 앱이 카카오톡/문자를 직접 보내지는 않습니다.</p>
+  </div>
+</div>
+
+<script src="fleet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
