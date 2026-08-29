@@ -65,6 +65,8 @@
   const scheduleCategorySelect = document.getElementById('schedule-category');
   const scheduleLabelInput = document.getElementById('schedule-label');
   const insurancePresetsDatalist = document.getElementById('insurance-presets');
+  const scheduleInsurerField = document.getElementById('schedule-insurer-field');
+  const scheduleInsurerInput = document.getElementById('schedule-insurer');
   const scheduleLastDateInput = document.getElementById('schedule-lastdate');
   const scheduleOverrideToggle = document.getElementById('schedule-override-toggle');
   const scheduleCycleMonthsField = document.getElementById('schedule-cyclemonths-field');
@@ -320,6 +322,7 @@
         </div>
         <div class="item-card-meta">
           <span>구분: ${categoryLabel}</span>
+          ${s.category === 'insurance' && s.insurer ? `<span>보험사: ${escapeHtml(s.insurer)}</span>` : ''}
           <span>마지막 일자: ${s.lastDate || '-'}</span>
           <span>다음 예정일: ${dueDate || '미입력'}</span>
           ${s.note ? `<span>비고: ${escapeHtml(s.note)}</span>` : ''}
@@ -553,9 +556,11 @@
     if (scheduleCategorySelect.value === 'inspection') {
       scheduleLabelInput.value = typeInfo ? typeInfo.inspectionLabel : '정기검사';
       scheduleLabelInput.readOnly = true;
+      scheduleInsurerField.hidden = true;
     } else {
       scheduleLabelInput.readOnly = false;
       if (!scheduleIdInput.value) scheduleLabelInput.value = '';
+      scheduleInsurerField.hidden = false;
     }
   }
 
@@ -578,6 +583,8 @@
       scheduleCategorySelect.value = s.category;
       scheduleLabelInput.value = s.label;
       scheduleLabelInput.readOnly = s.category === 'inspection';
+      scheduleInsurerField.hidden = s.category === 'inspection';
+      scheduleInsurerInput.value = s.insurer || '';
       scheduleLastDateInput.value = s.lastDate || '';
       scheduleOverrideToggle.checked = !!s.nextDateOverride;
       scheduleCycleMonthsInput.value = s.cycleMonths || '';
@@ -663,6 +670,7 @@
         vehicleId: currentDetailVehicleId,
         category,
         label,
+        insurer: category === 'insurance' ? scheduleInsurerInput.value.trim() : '',
         lastDate,
         cycleMonths,
         nextDateOverride,

@@ -358,31 +358,31 @@ const SEED_VEHICLES = [
 const SEED_SCHEDULES = [
   // 포터1 — 검사 경과, 보험 임박
   { id: 's-1', vehicleId: 'v-porter-1', category: 'inspection', label: '자동차 정기검사', lastDate: '2025-08-20', cycleMonths: 12, nextDateOverride: null, note: '' },
-  { id: 's-2', vehicleId: 'v-porter-1', category: 'insurance', label: '자동차보험', lastDate: '2025-09-01', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-2', vehicleId: 'v-porter-1', category: 'insurance', label: '자동차보험', insurer: '삼성화재', lastDate: '2025-09-01', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 포터2 — 정상
   { id: 's-3', vehicleId: 'v-porter-2', category: 'inspection', label: '자동차 정기검사', lastDate: '2026-02-15', cycleMonths: 12, nextDateOverride: null, note: '' },
-  { id: 's-4', vehicleId: 'v-porter-2', category: 'insurance', label: '자동차보험', lastDate: '2026-01-10', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-4', vehicleId: 'v-porter-2', category: 'insurance', label: '자동차보험', insurer: 'DB손해보험', lastDate: '2026-01-10', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 포터3 — 검사 임박, 보험 경과
   { id: 's-5', vehicleId: 'v-porter-3', category: 'inspection', label: '자동차 정기검사', lastDate: '2025-09-05', cycleMonths: 12, nextDateOverride: null, note: '' },
-  { id: 's-6', vehicleId: 'v-porter-3', category: 'insurance', label: '자동차보험', lastDate: '2025-08-01', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-6', vehicleId: 'v-porter-3', category: 'insurance', label: '자동차보험', insurer: '현대해상', lastDate: '2025-08-01', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 포터4 — 정상
   { id: 's-7', vehicleId: 'v-porter-4', category: 'inspection', label: '자동차 정기검사', lastDate: '2026-03-01', cycleMonths: 12, nextDateOverride: null, note: '' },
-  { id: 's-8', vehicleId: 'v-porter-4', category: 'insurance', label: '자동차보험', lastDate: '2026-04-01', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-8', vehicleId: 'v-porter-4', category: 'insurance', label: '자동차보험', insurer: 'KB손해보험', lastDate: '2026-04-01', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 포터5 — 검사 경과
   { id: 's-9', vehicleId: 'v-porter-5', category: 'inspection', label: '자동차 정기검사', lastDate: '2025-08-25', cycleMonths: 12, nextDateOverride: null, note: '' },
-  { id: 's-10', vehicleId: 'v-porter-5', category: 'insurance', label: '자동차보험', lastDate: '2026-06-01', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-10', vehicleId: 'v-porter-5', category: 'insurance', label: '자동차보험', insurer: '삼성화재', lastDate: '2026-06-01', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 포터6 — 정상
   { id: 's-11', vehicleId: 'v-porter-6', category: 'inspection', label: '자동차 정기검사', lastDate: '2026-05-01', cycleMonths: 12, nextDateOverride: null, note: '' },
-  { id: 's-12', vehicleId: 'v-porter-6', category: 'insurance', label: '자동차보험', lastDate: '2026-07-01', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-12', vehicleId: 'v-porter-6', category: 'insurance', label: '자동차보험', insurer: 'DB손해보험', lastDate: '2026-07-01', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 덤프1 — 검사 임박(화물차 6개월 주기)
   { id: 's-13', vehicleId: 'v-dump-1', category: 'inspection', label: '자동차 정기검사', lastDate: '2026-03-10', cycleMonths: 6, nextDateOverride: null, note: '사업용 화물차 — 실제 통지서 기준으로 주기를 다시 확인할 것' },
-  { id: 's-14', vehicleId: 'v-dump-1', category: 'insurance', label: '화물자동차보험', lastDate: '2026-02-01', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-14', vehicleId: 'v-dump-1', category: 'insurance', label: '화물자동차보험', insurer: '현대해상', lastDate: '2026-02-01', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 포크레인1 — 건설기계 검사 경과
   { id: 's-15', vehicleId: 'v-excavator-1', category: 'inspection', label: '건설기계 정기검사', lastDate: '2025-08-01', cycleMonths: 12, nextDateOverride: null, note: '' },
-  { id: 's-16', vehicleId: 'v-excavator-1', category: 'insurance', label: '건설기계보험', lastDate: '2026-06-15', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-16', vehicleId: 'v-excavator-1', category: 'insurance', label: '건설기계보험', insurer: 'KB손해보험', lastDate: '2026-06-15', cycleMonths: 12, nextDateOverride: null, note: '' },
   // 승용차1 — 검사 경과(비사업용 24개월 주기)
   { id: 's-17', vehicleId: 'v-car-1', category: 'inspection', label: '자동차 정기검사', lastDate: '2024-08-01', cycleMonths: 24, nextDateOverride: null, note: '' },
-  { id: 's-18', vehicleId: 'v-car-1', category: 'insurance', label: '자동차보험', lastDate: '2026-05-01', cycleMonths: 12, nextDateOverride: null, note: '' },
+  { id: 's-18', vehicleId: 'v-car-1', category: 'insurance', label: '자동차보험', insurer: '삼성화재', lastDate: '2026-05-01', cycleMonths: 12, nextDateOverride: null, note: '' },
 ];
 
 const SEED_CONSUMABLES = [
