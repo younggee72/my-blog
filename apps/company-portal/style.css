@@ -87,6 +87,33 @@ a {
   margin: 0;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 0.5rem 0.85rem;
+  min-height: 44px;
+  font-size: 0.85rem;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-btn:hover {
+  border-color: var(--color-accent);
+}
+
 .theme-toggle {
   flex-shrink: 0;
   border: 1px solid var(--color-border);
@@ -752,5 +779,13 @@ textarea {
 
   .detail-header-actions {
     flex-direction: column;
+  }
+
+  .header-btn-label {
+    display: none;
+  }
+
+  .header-btn {
+    padding: 0.5rem 0.65rem;
   }
 }
