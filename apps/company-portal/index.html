@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>지천건설 사내 포털</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <h1 class="title">🏢 지천건설 사내 포털</h1>
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
+</header>
+
+<section id="guide-box" class="guide-box">
+  <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true">
+    <span id="guide-toggle-label">사용법 안내 닫기</span>
+  </button>
+  <div id="guide-content" class="guide-content">
+    <ul>
+      <li>이 페이지의 현장 데이터는 <strong>이 브라우저(로컬 저장소)에만 저장</strong>되며, 서버로 전송되지 않습니다.</li>
+      <li>목록 카드에는 <strong>금액 정보(계약금액·기성 청구/수금)가 표시되지 않습니다.</strong> 현장 카드를 클릭해 상세를 펼쳐야 금액 정보를 확인할 수 있습니다.</li>
+      <li>투입 차량은 <strong>법인차량 관리</strong> 앱에 등록된 차량 목록에서 선택하거나, 목록에 없는 차량/장비는 직접 입력할 수 있습니다.</li>
+      <li>아래 "업무 도구" 카드로 현장정산서 자동화, 법인차량 관리 앱으로 바로 이동할 수 있습니다.</li>
+    </ul>
+  </div>
+</section>
+
+<main class="container">
+
+  <!-- ================= 업무 도구(허브) 섹션 ================= -->
+  <section class="section-block">
+    <div class="section-block-head">
+      <h2>업무 도구</h2>
+    </div>
+    <div class="hub-grid">
+      <a class="hub-card" href="../settlement/index.html">
+        <span class="hub-card-icon">🧾</span>
+        <span class="hub-card-title">현장정산서 자동화 도구</span>
+        <span class="hub-card-desc">세금계산서를 불러와 현장별 정산서를 자동으로 생성합니다.</span>
+      </a>
+      <a class="hub-card" href="../vehicle-fleet/index.html">
+        <span class="hub-card-icon">🚚</span>
+        <span class="hub-card-title">법인차량 관리</span>
+        <span class="hub-card-desc">차량별 정기검사·보험·소모품 교체 일정을 관리합니다.</span>
+      </a>
+      <div class="hub-card hub-card-disabled" aria-disabled="true">
+        <span class="hub-card-icon">🧩</span>
+        <span class="hub-card-title">기타 업무 도구</span>
+        <span class="hub-card-desc">추후 추가 예정입니다.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 진행중인 현장 섹션 ================= -->
+  <section class="section-block">
+    <div class="section-block-head">
+      <h2>진행중인 현장</h2>
+    </div>
+
+    <div class="action-bar">
+      <button id="add-site-btn" class="btn btn-primary" type="button">+ 새 현장 등록</button>
+      <span id="site-count" class="site-count"></span>
+    </div>
+
+    <!-- 현장 등록/수정 폼 -->
+    <div id="site-form-panel" class="form-panel" hidden>
+      <h3 id="site-form-title">새 현장 등록</h3>
+      <form id="site-form" class="form-grid" novalidate>
+        <input type="hidden" id="site-id">
+
+        <div class="form-field">
+          <label for="site-name">현장명 <span class="req">*</span></label>
+          <input id="site-name" type="text" required maxlength="60" placeholder="예: oo아파트 신축공사">
+          <p class="error-msg" data-for="name" hidden></p>
+        </div>
+
+        <div class="form-field">
+          <label for="site-address">위치(주소) <span class="req">*</span></label>
+          <input id="site-address" type="text" required maxlength="120" placeholder="예: 서울시 OO구 OO동 123">
+          <p class="error-msg" data-for="address" hidden></p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="site-startdate">착공일 <span class="req">*</span></label>
+            <input id="site-startdate" type="date" required>
+            <p class="error-msg" data-for="startdate" hidden></p>
+          </div>
+          <div class="form-field">
+            <label for="site-enddate">준공예정일</label>
+            <input id="site-enddate" type="date">
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="site-manager">담당자 <span class="req">*</span></label>
+          <input id="site-manager" type="text" required maxlength="30" placeholder="예: 김현장">
+          <p class="error-msg" data-for="manager" hidden></p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="site-stage">진행 단계</label>
+            <select id="site-stage"></select>
+          </div>
+          <div class="form-field">
+            <label for="site-progress">공정률(%)</label>
+            <input id="site-progress" type="number" min="0" max="100" step="1" inputmode="numeric">
+          </div>
+        </div>
+        <input id="site-progress-range" type="range" min="0" max="100" step="1" aria-label="공정률 슬라이더">
+
+        <p class="form-hint">아래 금액 정보는 목록 카드에는 표시되지 않고, 상세를 펼쳤을 때만 노출됩니다.</p>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="site-contract">계약금액(원)</label>
+            <input id="site-contract" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 3200000000">
+          </div>
+          <div class="form-field">
+            <label for="site-billed">기성 청구액(원)</label>
+            <input id="site-billed" type="number" min="0" step="1" inputmode="numeric">
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="site-collected">기성 수금액(원)</label>
+          <input id="site-collected" type="number" min="0" step="1" inputmode="numeric">
+        </div>
+
+        <div class="form-field">
+          <label>투입 차량 (법인차량 관리 등록 목록)</label>
+          <div id="site-vehicle-checklist" class="vehicle-checklist"></div>
+          <p id="site-vehicle-empty-msg" class="form-hint" hidden>등록된 차량이 없습니다. 법인차량 관리에서 먼저 등록하거나 아래에 직접 입력하세요.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="site-vehicle-freetext">투입 차량/장비 직접 입력</label>
+          <textarea id="site-vehicle-freetext" rows="2" placeholder="예: 포터 2대, 포크레인 1대 투입"></textarea>
+        </div>
+
+        <div class="form-field">
+          <label for="site-memo">비고</label>
+          <textarea id="site-memo" rows="2"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">저장</button>
+          <button type="button" id="site-form-cancel" class="btn btn-secondary">취소</button>
+        </div>
+        <p id="site-form-toast" class="form-toast" role="status" hidden></p>
+      </form>
+    </div>
+
+    <div id="site-list" class="site-grid"></div>
+    <p id="site-empty-msg" class="empty-msg" hidden>등록된 현장이 없습니다. "+ 새 현장 등록" 버튼으로 첫 현장을 등록해보세요.</p>
+  </section>
+
+</main>
+
+<!-- 현장 상세 모달 -->
+<div id="site-detail-overlay" class="modal-overlay" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="site-detail-title">
+    <button id="site-detail-close" class="modal-close" type="button" aria-label="닫기">✕</button>
+    <h2 id="site-detail-title"></h2>
+    <div id="site-detail-meta" class="detail-header-meta"></div>
+
+    <div class="section-block">
+      <div class="progress-bar-track"><div id="site-detail-progress-fill" class="progress-bar-fill"></div></div>
+      <p id="site-detail-progress-label" class="form-hint"></p>
+    </div>
+
+    <div class="money-box">
+      <h3>금액 정보</h3>
+      <dl class="money-list">
+        <dt>계약금액</dt><dd id="site-detail-contract"></dd>
+        <dt>기성 청구액</dt><dd id="site-detail-billed"></dd>
+        <dt>기성 수금액</dt><dd id="site-detail-collected"></dd>
+      </dl>
+    </div>
+
+    <div class="section-block">
+      <h3>투입 차량/장비</h3>
+      <ul id="site-detail-vehicles" class="vehicle-tag-list"></ul>
+      <p id="site-detail-vehicles-empty" class="form-hint" hidden>등록된 투입 차량/장비 정보가 없습니다.</p>
+    </div>
+
+    <p id="site-detail-memo" class="detail-note" hidden></p>
+
+    <div class="detail-header-actions">
+      <button id="site-detail-edit-btn" class="btn btn-secondary" type="button">수정</button>
+      <button id="site-detail-delete-btn" class="btn btn-danger" type="button">삭제</button>
+    </div>
+  </div>
+</div>
+
+<script src="portal.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
