@@ -344,15 +344,15 @@ function sendWebhookNotification(url, payload) {
 // 골고루 섞이도록 날짜를 역산해서 구성했다.
 
 const SEED_VEHICLES = [
-  { id: 'v-porter-1', plateNumber: '12가 1001', vehicleType: 'porter', modelName: '포터2 초장축', driver: '김민수', note: '', currentOdometer: 82000, createdAt: '2024-01-10T09:00:00.000Z' },
-  { id: 'v-porter-2', plateNumber: '12가 1002', vehicleType: 'porter', modelName: '포터2 초장축', driver: '이철수', note: '', currentOdometer: 65000, createdAt: '2024-02-15T09:00:00.000Z' },
-  { id: 'v-porter-3', plateNumber: '12가 1003', vehicleType: 'porter', modelName: '포터2 슈퍼캡', driver: '박영희', note: '자재 운반 전담', currentOdometer: 120000, createdAt: '2023-11-01T09:00:00.000Z' },
-  { id: 'v-porter-4', plateNumber: '12가 1004', vehicleType: 'porter', modelName: '포터2 초장축', driver: '최성훈', note: '', currentOdometer: 45000, createdAt: '2024-06-20T09:00:00.000Z' },
-  { id: 'v-porter-5', plateNumber: '12가 1005', vehicleType: 'porter', modelName: '포터2 슈퍼캡', driver: '정다은', note: '', currentOdometer: 98000, createdAt: '2023-09-05T09:00:00.000Z' },
-  { id: 'v-porter-6', plateNumber: '12가 1006', vehicleType: 'porter', modelName: '포터2 초장축', driver: '강태현', note: '신차 교체분', currentOdometer: 30000, createdAt: '2025-01-15T09:00:00.000Z' },
-  { id: 'v-dump-1', plateNumber: '34나 2001', vehicleType: 'dump', modelName: '2.5톤 덤프', driver: '오준영', note: '사업용(화물)', currentOdometer: 150000, createdAt: '2022-05-01T09:00:00.000Z' },
-  { id: 'v-excavator-1', plateNumber: '포크레인 1호기', vehicleType: 'excavator', modelName: '0.6㎥급 굴착기', driver: '한도현', note: '가동시간 기준 관리(주행거리 미입력)', currentOdometer: null, createdAt: '2022-08-10T09:00:00.000Z' },
-  { id: 'v-car-1', plateNumber: '12가 9001', vehicleType: 'car', modelName: '쏘나타', driver: '대표이사', note: '업무용 승용차', currentOdometer: 20000, createdAt: '2024-03-01T09:00:00.000Z' },
+  { id: 'v-porter-1', plateNumber: '12가 1001', vehicleType: 'porter', modelName: '포터2 초장축', driver: '김민수', note: '', currentOdometer: 82000, firstRegisteredDate: '2023-12-20', createdAt: '2024-01-10T09:00:00.000Z' },
+  { id: 'v-porter-2', plateNumber: '12가 1002', vehicleType: 'porter', modelName: '포터2 초장축', driver: '이철수', note: '', currentOdometer: 65000, firstRegisteredDate: '2024-02-01', createdAt: '2024-02-15T09:00:00.000Z' },
+  { id: 'v-porter-3', plateNumber: '12가 1003', vehicleType: 'porter', modelName: '포터2 슈퍼캡', driver: '박영희', note: '자재 운반 전담', currentOdometer: 120000, firstRegisteredDate: '2023-10-15', createdAt: '2023-11-01T09:00:00.000Z' },
+  { id: 'v-porter-4', plateNumber: '12가 1004', vehicleType: 'porter', modelName: '포터2 초장축', driver: '최성훈', note: '', currentOdometer: 45000, firstRegisteredDate: '2024-06-05', createdAt: '2024-06-20T09:00:00.000Z' },
+  { id: 'v-porter-5', plateNumber: '12가 1005', vehicleType: 'porter', modelName: '포터2 슈퍼캡', driver: '정다은', note: '', currentOdometer: 98000, firstRegisteredDate: '2023-08-20', createdAt: '2023-09-05T09:00:00.000Z' },
+  { id: 'v-porter-6', plateNumber: '12가 1006', vehicleType: 'porter', modelName: '포터2 초장축', driver: '강태현', note: '신차 교체분', currentOdometer: 30000, firstRegisteredDate: '2025-01-05', createdAt: '2025-01-15T09:00:00.000Z' },
+  { id: 'v-dump-1', plateNumber: '34나 2001', vehicleType: 'dump', modelName: '2.5톤 덤프', driver: '오준영', note: '사업용(화물)', currentOdometer: 150000, firstRegisteredDate: '2022-04-10', createdAt: '2022-05-01T09:00:00.000Z' },
+  { id: 'v-excavator-1', plateNumber: '포크레인 1호기', vehicleType: 'excavator', modelName: '0.6㎥급 굴착기', driver: '한도현', note: '가동시간 기준 관리(주행거리 미입력)', currentOdometer: null, firstRegisteredDate: '2022-07-25', createdAt: '2022-08-10T09:00:00.000Z' },
+  { id: 'v-car-1', plateNumber: '12가 9001', vehicleType: 'car', modelName: '쏘나타', driver: '대표이사', note: '업무용 승용차', currentOdometer: 20000, firstRegisteredDate: '2024-02-15', createdAt: '2024-03-01T09:00:00.000Z' },
 ];
 
 const SEED_SCHEDULES = [

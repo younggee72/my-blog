@@ -47,6 +47,7 @@
   const vehicleTypeSelect = document.getElementById('vehicle-type');
   const vehicleModelInput = document.getElementById('vehicle-model');
   const vehicleDriverInput = document.getElementById('vehicle-driver');
+  const vehicleFirstRegisteredInput = document.getElementById('vehicle-first-registered');
   const vehicleOdometerInput = document.getElementById('vehicle-odometer');
   const vehicleOdometerHint = document.getElementById('vehicle-odometer-hint');
   const vehicleNoteInput = document.getElementById('vehicle-note');
@@ -276,6 +277,7 @@
       typeInfo ? typeInfo.label : vehicle.vehicleType,
       `담당자: ${vehicle.driver || '미지정'}`,
       `모델: ${vehicle.modelName || '-'}`,
+      `최초등록일: ${vehicle.firstRegisteredDate || '미입력'}`,
       vehicle.currentOdometer != null ? `현재 ${formatKm(vehicle.currentOdometer)}` : '주행거리 미입력',
     ];
     detailMetaEl.textContent = metaParts.join(' · ');
@@ -423,6 +425,7 @@
       vehicleTypeSelect.value = v.vehicleType;
       vehicleModelInput.value = v.modelName || '';
       vehicleDriverInput.value = v.driver || '';
+      vehicleFirstRegisteredInput.value = v.firstRegisteredDate || '';
       vehicleOdometerInput.value = v.currentOdometer != null ? v.currentOdometer : '';
       vehicleNoteInput.value = v.note || '';
       vehicleAutoConsumablesField.hidden = true;
@@ -472,6 +475,7 @@
         vehicleType: type,
         modelName: vehicleModelInput.value.trim(),
         driver: vehicleDriverInput.value.trim(),
+        firstRegisteredDate: vehicleFirstRegisteredInput.value || '',
         note: vehicleNoteInput.value.trim(),
         currentOdometer: odometerRaw === '' ? null : Number(odometerRaw),
       };
