@@ -177,6 +177,139 @@ a {
   font-size: 1rem;
 }
 
+/* ---------- 공개 랜딩(대외 홍보) 섹션 ---------- */
+.landing-hero {
+  text-align: center;
+  padding: 2.25rem 1rem 1.5rem;
+}
+
+.landing-company-name {
+  margin: 0 0 0.5rem;
+  font-size: 1.9rem;
+  font-weight: 800;
+}
+
+.landing-slogan {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  color: var(--color-text-secondary);
+}
+
+.placeholder-badge {
+  display: inline-block;
+  background: #fff7e6;
+  color: #92600a;
+  border: 1px solid #f0c36d;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+:root[data-theme='dark'] .placeholder-badge {
+  background: #3a2f10;
+  color: #f0c36d;
+  border-color: #6b5215;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .placeholder-badge {
+    background: #3a2f10;
+    color: #f0c36d;
+    border-color: #6b5215;
+  }
+}
+
+.landing-business-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.landing-business-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1.1rem;
+}
+
+.landing-business-icon {
+  font-size: 1.6rem;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.landing-business-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.landing-business-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.landing-portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.85rem;
+}
+
+.landing-portfolio-card {
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.landing-portfolio-thumb {
+  background: var(--color-code-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  height: 110px;
+  margin-bottom: 0.6rem;
+}
+
+.landing-portfolio-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.landing-contact-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.9rem;
+  row-gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.92rem;
+}
+
+.landing-contact-list dt {
+  color: var(--color-text-secondary);
+}
+
+.landing-contact-list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.unlock-area {
+  text-align: center;
+  padding: 1.75rem 1rem 2.25rem;
+  border-top: 1px solid var(--color-border);
+  margin-top: 1.5rem;
+}
+
+.unlock-hint {
+  max-width: 480px;
+  margin: 0.65rem auto 0;
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+}
+
 /* ---------- 업무 도구(허브) 카드 ---------- */
 .hub-grid {
   display: grid;
@@ -603,8 +736,14 @@ textarea {
 /* ---------- 반응형 ---------- */
 @media (max-width: 640px) {
   .site-grid,
-  .hub-grid {
+  .hub-grid,
+  .landing-business-grid,
+  .landing-portfolio-grid {
     grid-template-columns: 1fr;
+  }
+
+  .landing-company-name {
+    font-size: 1.5rem;
   }
 
   .form-row {

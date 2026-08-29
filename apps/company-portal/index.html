@@ -23,140 +23,243 @@
       <li>목록 카드에는 <strong>금액 정보(계약금액·기성 청구/수금)가 표시되지 않습니다.</strong> 현장 카드를 클릭해 상세를 펼쳐야 금액 정보를 확인할 수 있습니다.</li>
       <li>투입 차량은 <strong>법인차량 관리</strong> 앱에 등록된 차량 목록에서 선택하거나, 목록에 없는 차량/장비는 직접 입력할 수 있습니다.</li>
       <li>아래 "업무 도구" 카드로 현장정산서 자동화, 법인차량 관리 앱으로 바로 이동할 수 있습니다.</li>
+      <li>🔒 직원 전용 업무 시스템은 비밀번호로 잠겨 있으며, 이는 완전한 보안이 아닌 클라이언트 수준의 가림막입니다.</li>
     </ul>
   </div>
 </section>
 
 <main class="container">
 
-  <!-- ================= 업무 도구(허브) 섹션 ================= -->
-  <section class="section-block">
-    <div class="section-block-head">
-      <h2>업무 도구</h2>
-    </div>
-    <div class="hub-grid">
-      <a class="hub-card" href="../settlement/index.html">
-        <span class="hub-card-icon">🧾</span>
-        <span class="hub-card-title">현장정산서 자동화 도구</span>
-        <span class="hub-card-desc">세금계산서를 불러와 현장별 정산서를 자동으로 생성합니다.</span>
-      </a>
-      <a class="hub-card" href="../vehicle-fleet/index.html">
-        <span class="hub-card-icon">🚚</span>
-        <span class="hub-card-title">법인차량 관리</span>
-        <span class="hub-card-desc">차량별 정기검사·보험·소모품 교체 일정을 관리합니다.</span>
-      </a>
-      <div class="hub-card hub-card-disabled" aria-disabled="true">
-        <span class="hub-card-icon">🧩</span>
-        <span class="hub-card-title">기타 업무 도구</span>
-        <span class="hub-card-desc">추후 추가 예정입니다.</span>
+  <!-- ================= 공개 랜딩(대외 홍보) 섹션 ================= -->
+  <section id="public-landing">
+
+    <!-- 히어로 -->
+    <section class="landing-hero">
+      <h1 class="landing-company-name">주식회사 지천건설</h1>
+      <p class="landing-slogan">믿을 수 있는 시공, 지천건설이 만듭니다</p>
+      <span class="placeholder-badge">⚠️ 예시 문구입니다. 실제 슬로건으로 교체하세요.</span>
+    </section>
+
+    <!-- 사업분야 소개 -->
+    <section class="section-block">
+      <div class="section-block-head">
+        <h2>사업분야</h2>
       </div>
+      <div class="landing-business-grid">
+        <div class="landing-business-card">
+          <span class="landing-business-icon">🛣️</span>
+          <h3>토목</h3>
+          <p>도로, 상하수도, 부지 조성 등 토목 공사 전반을 수행합니다. (예시 문구 — 실제 사업 내용으로 교체 필요)</p>
+        </div>
+        <div class="landing-business-card">
+          <span class="landing-business-icon">🏢</span>
+          <h3>건축</h3>
+          <p>주거·상업 건축물의 신축 및 증축 공사를 진행합니다. (예시 문구 — 실제 사업 내용으로 교체 필요)</p>
+        </div>
+        <div class="landing-business-card">
+          <span class="landing-business-icon">🚜</span>
+          <h3>중장비 임대</h3>
+          <p>포크레인, 덤프트럭 등 중장비를 임대·운영합니다. (예시 문구 — 실제 사업 내용으로 교체 필요)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 시공실적/포트폴리오 -->
+    <section class="section-block">
+      <div class="section-block-head">
+        <h2>시공실적</h2>
+      </div>
+      <div class="landing-portfolio-grid">
+        <div class="landing-portfolio-card">
+          <div class="landing-portfolio-thumb" aria-hidden="true"></div>
+          <p>추후 시공 사례가 추가될 예정입니다.</p>
+        </div>
+        <div class="landing-portfolio-card">
+          <div class="landing-portfolio-thumb" aria-hidden="true"></div>
+          <p>추후 시공 사례가 추가될 예정입니다.</p>
+        </div>
+        <div class="landing-portfolio-card">
+          <div class="landing-portfolio-thumb" aria-hidden="true"></div>
+          <p>추후 시공 사례가 추가될 예정입니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 연락처 -->
+    <section class="section-block">
+      <div class="section-block-head">
+        <h2>연락처</h2>
+      </div>
+      <span class="placeholder-badge">⚠️ 아래 연락처는 예시입니다. 실제 정보로 수정하세요.</span>
+      <dl class="landing-contact-list">
+        <dt>주소</dt><dd>경기도 OO시 OO구 OO로 123</dd>
+        <dt>전화</dt><dd>031-000-0000</dd>
+        <dt>이메일</dt><dd>info@example.com</dd>
+      </dl>
+    </section>
+
+    <!-- 직원 전용 진입 -->
+    <div class="unlock-area">
+      <button id="unlock-btn" class="btn btn-secondary" type="button">🔒 직원 전용 업무 시스템</button>
+      <p class="unlock-hint">이 잠금은 완전한 보안 장치가 아닙니다. 브라우저 개발자도구 등으로 우회될 수 있는 클라이언트 수준의 가림막입니다.</p>
     </div>
+
   </section>
 
-  <!-- ================= 진행중인 현장 섹션 ================= -->
-  <section class="section-block">
-    <div class="section-block-head">
-      <h2>진행중인 현장</h2>
-    </div>
+  <!-- ================= 내부 레이어(비밀번호 통과 후에만 노출) ================= -->
+  <section id="internal-area" hidden>
 
-    <div class="action-bar">
-      <button id="add-site-btn" class="btn btn-primary" type="button">+ 새 현장 등록</button>
-      <span id="site-count" class="site-count"></span>
-    </div>
-
-    <!-- 현장 등록/수정 폼 -->
-    <div id="site-form-panel" class="form-panel" hidden>
-      <h3 id="site-form-title">새 현장 등록</h3>
-      <form id="site-form" class="form-grid" novalidate>
-        <input type="hidden" id="site-id">
-
-        <div class="form-field">
-          <label for="site-name">현장명 <span class="req">*</span></label>
-          <input id="site-name" type="text" required maxlength="60" placeholder="예: oo아파트 신축공사">
-          <p class="error-msg" data-for="name" hidden></p>
+    <!-- ================= 업무 도구(허브) 섹션 ================= -->
+    <section class="section-block">
+      <div class="section-block-head">
+        <h2>업무 도구</h2>
+      </div>
+      <div class="hub-grid">
+        <a class="hub-card" href="../settlement/index.html">
+          <span class="hub-card-icon">🧾</span>
+          <span class="hub-card-title">현장정산서 자동화 도구</span>
+          <span class="hub-card-desc">세금계산서를 불러와 현장별 정산서를 자동으로 생성합니다.</span>
+        </a>
+        <a class="hub-card" href="../vehicle-fleet/index.html">
+          <span class="hub-card-icon">🚚</span>
+          <span class="hub-card-title">법인차량 관리</span>
+          <span class="hub-card-desc">차량별 정기검사·보험·소모품 교체 일정을 관리합니다.</span>
+        </a>
+        <div class="hub-card hub-card-disabled" aria-disabled="true">
+          <span class="hub-card-icon">🧩</span>
+          <span class="hub-card-title">기타 업무 도구</span>
+          <span class="hub-card-desc">추후 추가 예정입니다.</span>
         </div>
+      </div>
+    </section>
 
-        <div class="form-field">
-          <label for="site-address">위치(주소) <span class="req">*</span></label>
-          <input id="site-address" type="text" required maxlength="120" placeholder="예: 서울시 OO구 OO동 123">
-          <p class="error-msg" data-for="address" hidden></p>
-        </div>
+    <!-- ================= 진행중인 현장 섹션 ================= -->
+    <section class="section-block">
+      <div class="section-block-head">
+        <h2>진행중인 현장</h2>
+      </div>
 
-        <div class="form-row">
+      <div class="action-bar">
+        <button id="add-site-btn" class="btn btn-primary" type="button">+ 새 현장 등록</button>
+        <span id="site-count" class="site-count"></span>
+      </div>
+
+      <!-- 현장 등록/수정 폼 -->
+      <div id="site-form-panel" class="form-panel" hidden>
+        <h3 id="site-form-title">새 현장 등록</h3>
+        <form id="site-form" class="form-grid" novalidate>
+          <input type="hidden" id="site-id">
+
           <div class="form-field">
-            <label for="site-startdate">착공일 <span class="req">*</span></label>
-            <input id="site-startdate" type="date" required>
-            <p class="error-msg" data-for="startdate" hidden></p>
+            <label for="site-name">현장명 <span class="req">*</span></label>
+            <input id="site-name" type="text" required maxlength="60" placeholder="예: oo아파트 신축공사">
+            <p class="error-msg" data-for="name" hidden></p>
+          </div>
+
+          <div class="form-field">
+            <label for="site-address">위치(주소) <span class="req">*</span></label>
+            <input id="site-address" type="text" required maxlength="120" placeholder="예: 서울시 OO구 OO동 123">
+            <p class="error-msg" data-for="address" hidden></p>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="site-startdate">착공일 <span class="req">*</span></label>
+              <input id="site-startdate" type="date" required>
+              <p class="error-msg" data-for="startdate" hidden></p>
+            </div>
+            <div class="form-field">
+              <label for="site-enddate">준공예정일</label>
+              <input id="site-enddate" type="date">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="site-manager">담당자 <span class="req">*</span></label>
+            <input id="site-manager" type="text" required maxlength="30" placeholder="예: 김현장">
+            <p class="error-msg" data-for="manager" hidden></p>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="site-stage">진행 단계</label>
+              <select id="site-stage"></select>
+            </div>
+            <div class="form-field">
+              <label for="site-progress">공정률(%)</label>
+              <input id="site-progress" type="number" min="0" max="100" step="1" inputmode="numeric">
+            </div>
+          </div>
+          <input id="site-progress-range" type="range" min="0" max="100" step="1" aria-label="공정률 슬라이더">
+
+          <p class="form-hint">아래 금액 정보는 목록 카드에는 표시되지 않고, 상세를 펼쳤을 때만 노출됩니다.</p>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="site-contract">계약금액(원)</label>
+              <input id="site-contract" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 3200000000">
+            </div>
+            <div class="form-field">
+              <label for="site-billed">기성 청구액(원)</label>
+              <input id="site-billed" type="number" min="0" step="1" inputmode="numeric">
+            </div>
           </div>
           <div class="form-field">
-            <label for="site-enddate">준공예정일</label>
-            <input id="site-enddate" type="date">
+            <label for="site-collected">기성 수금액(원)</label>
+            <input id="site-collected" type="number" min="0" step="1" inputmode="numeric">
           </div>
-        </div>
 
-        <div class="form-field">
-          <label for="site-manager">담당자 <span class="req">*</span></label>
-          <input id="site-manager" type="text" required maxlength="30" placeholder="예: 김현장">
-          <p class="error-msg" data-for="manager" hidden></p>
-        </div>
-
-        <div class="form-row">
           <div class="form-field">
-            <label for="site-stage">진행 단계</label>
-            <select id="site-stage"></select>
+            <label>투입 차량 (법인차량 관리 등록 목록)</label>
+            <div id="site-vehicle-checklist" class="vehicle-checklist"></div>
+            <p id="site-vehicle-empty-msg" class="form-hint" hidden>등록된 차량이 없습니다. 법인차량 관리에서 먼저 등록하거나 아래에 직접 입력하세요.</p>
           </div>
+
           <div class="form-field">
-            <label for="site-progress">공정률(%)</label>
-            <input id="site-progress" type="number" min="0" max="100" step="1" inputmode="numeric">
+            <label for="site-vehicle-freetext">투입 차량/장비 직접 입력</label>
+            <textarea id="site-vehicle-freetext" rows="2" placeholder="예: 포터 2대, 포크레인 1대 투입"></textarea>
           </div>
-        </div>
-        <input id="site-progress-range" type="range" min="0" max="100" step="1" aria-label="공정률 슬라이더">
 
-        <p class="form-hint">아래 금액 정보는 목록 카드에는 표시되지 않고, 상세를 펼쳤을 때만 노출됩니다.</p>
-        <div class="form-row">
           <div class="form-field">
-            <label for="site-contract">계약금액(원)</label>
-            <input id="site-contract" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 3200000000">
+            <label for="site-memo">비고</label>
+            <textarea id="site-memo" rows="2"></textarea>
           </div>
-          <div class="form-field">
-            <label for="site-billed">기성 청구액(원)</label>
-            <input id="site-billed" type="number" min="0" step="1" inputmode="numeric">
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">저장</button>
+            <button type="button" id="site-form-cancel" class="btn btn-secondary">취소</button>
           </div>
-        </div>
-        <div class="form-field">
-          <label for="site-collected">기성 수금액(원)</label>
-          <input id="site-collected" type="number" min="0" step="1" inputmode="numeric">
-        </div>
+          <p id="site-form-toast" class="form-toast" role="status" hidden></p>
+        </form>
+      </div>
 
-        <div class="form-field">
-          <label>투입 차량 (법인차량 관리 등록 목록)</label>
-          <div id="site-vehicle-checklist" class="vehicle-checklist"></div>
-          <p id="site-vehicle-empty-msg" class="form-hint" hidden>등록된 차량이 없습니다. 법인차량 관리에서 먼저 등록하거나 아래에 직접 입력하세요.</p>
-        </div>
+      <div id="site-list" class="site-grid"></div>
+      <p id="site-empty-msg" class="empty-msg" hidden>등록된 현장이 없습니다. "+ 새 현장 등록" 버튼으로 첫 현장을 등록해보세요.</p>
+    </section>
 
-        <div class="form-field">
-          <label for="site-vehicle-freetext">투입 차량/장비 직접 입력</label>
-          <textarea id="site-vehicle-freetext" rows="2" placeholder="예: 포터 2대, 포크레인 1대 투입"></textarea>
-        </div>
-
-        <div class="form-field">
-          <label for="site-memo">비고</label>
-          <textarea id="site-memo" rows="2"></textarea>
-        </div>
-
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">저장</button>
-          <button type="button" id="site-form-cancel" class="btn btn-secondary">취소</button>
-        </div>
-        <p id="site-form-toast" class="form-toast" role="status" hidden></p>
-      </form>
-    </div>
-
-    <div id="site-list" class="site-grid"></div>
-    <p id="site-empty-msg" class="empty-msg" hidden>등록된 현장이 없습니다. "+ 새 현장 등록" 버튼으로 첫 현장을 등록해보세요.</p>
   </section>
 
 </main>
+
+<!-- 비밀번호 입력 모달 -->
+<div id="password-modal-overlay" class="modal-overlay" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
+    <button id="password-modal-close" class="modal-close" type="button" aria-label="닫기">✕</button>
+    <h2 id="password-modal-title">🔒 직원 전용 업무 시스템</h2>
+    <p class="form-hint">비밀번호 4자리를 입력하세요.</p>
+    <form id="password-form" class="form-grid" novalidate>
+      <div class="form-field">
+        <label for="password-input">비밀번호</label>
+        <input id="password-input" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+        <p id="password-error-msg" class="error-msg" hidden>비밀번호가 올바르지 않습니다.</p>
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="password-submit-btn" class="btn btn-primary">확인</button>
+        <button type="button" id="password-cancel-btn" class="btn btn-secondary">취소</button>
+      </div>
+      <p class="unlock-hint">이 잠금은 완전한 보안 장치가 아닙니다. 브라우저 개발자도구 등으로 우회될 수 있는 클라이언트 수준의 가림막입니다.</p>
+    </form>
+  </div>
+</div>
 
 <!-- 현장 상세 모달 -->
 <div id="site-detail-overlay" class="modal-overlay" hidden>

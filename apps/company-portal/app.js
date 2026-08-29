@@ -44,6 +44,17 @@
   const siteFormCancelBtn = document.getElementById('site-form-cancel');
   const siteFormToast = document.getElementById('site-form-toast');
 
+  // 접근 제어(비밀번호 잠금)
+  const internalArea = document.getElementById('internal-area');
+  const unlockBtn = document.getElementById('unlock-btn');
+  const passwordModalOverlay = document.getElementById('password-modal-overlay');
+  const passwordModalClose = document.getElementById('password-modal-close');
+  const passwordForm = document.getElementById('password-form');
+  const passwordInput = document.getElementById('password-input');
+  const passwordErrorMsg = document.getElementById('password-error-msg');
+  const passwordSubmitBtn = document.getElementById('password-submit-btn');
+  const passwordCancelBtn = document.getElementById('password-cancel-btn');
+
   // 상세 모달
   const siteDetailOverlay = document.getElementById('site-detail-overlay');
   const siteDetailClose = document.getElementById('site-detail-close');
@@ -399,6 +410,87 @@
     });
   }
 
+  // ---------- 접근 제어(비밀번호 잠금) ----------
+
+  let lastFocusedElBeforePasswordModal = null;
+
+  function openPasswordModal() {
+    passwordErrorMsg.hidden = true;
+    passwordInput.value = '';
+    lastFocusedElBeforePasswordModal = document.activeElement;
+    passwordModalOverlay.hidden = false;
+    passwordInput.focus();
+  }
+
+  function closePasswordModal() {
+    passwordModalOverlay.hidden = true;
+    passwordForm.reset();
+    passwordErrorMsg.hidden = true;
+    if (lastFocusedElBeforePasswordModal && typeof lastFocusedElBeforePasswordModal.focus === 'function') {
+      lastFocusedElBeforePasswordModal.focus();
+    }
+  }
+
+  function showInternalArea() {
+    internalArea.hidden = false;
+    unlockBtn.textContent = '🔓 잠금 해제됨 (다시 잠그기)';
+  }
+
+  function hideInternalArea() {
+    internalArea.hidden = true;
+    unlockBtn.textContent = '🔒 직원 전용 업무 시스템';
+  }
+
+  function initAccessControl() {
+    if (isUnlocked()) {
+      showInternalArea();
+    }
+
+    unlockBtn.addEventListener('click', () => {
+      if (isUnlocked()) {
+        lockAgain();
+        hideInternalArea();
+      } else {
+        openPasswordModal();
+      }
+    });
+
+    passwordModalClose.addEventListener('click', closePasswordModal);
+    passwordCancelBtn.addEventListener('click', closePasswordModal);
+    passwordModalOverlay.addEventListener('click', (event) => {
+      if (event.target === passwordModalOverlay) closePasswordModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !passwordModalOverlay.hidden) closePasswordModal();
+    });
+
+    passwordForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      passwordErrorMsg.hidden = true;
+      passwordSubmitBtn.disabled = true;
+
+      verifyPassword(passwordInput.value)
+        .then((ok) => {
+          if (ok) {
+            setUnlocked();
+            closePasswordModal();
+            showInternalArea();
+          } else {
+            passwordErrorMsg.hidden = false;
+            passwordInput.focus();
+            passwordInput.select();
+          }
+        })
+        .catch((err) => {
+          console.warn('[company-portal] 비밀번호 확인 중 오류가 발생했습니다.', err);
+          passwordErrorMsg.hidden = false;
+        })
+        .finally(() => {
+          passwordSubmitBtn.disabled = false;
+        });
+    });
+  }
+
   // ---------- 사용법 안내 박스 ----------
 
   const GUIDE_KEY = 'company-portal-guide-collapsed';
@@ -425,6 +517,7 @@
   function init() {
     initTheme();
     initGuideBox();
+    initAccessControl();
     populateStageSelect();
     bindStagePrefill();
     bindSiteForm();

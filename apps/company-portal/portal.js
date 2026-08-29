@@ -10,6 +10,39 @@ const INIT_FLAG_KEY = 'company-portal-initialized';
 // (읽기 전용 참조. company-portal은 이 키에 절대 쓰지 않는다.)
 const VEHICLE_FLEET_VEHICLES_KEY = 'vehicle-fleet-vehicles';
 
+// ---------- 접근 제어(비밀번호 잠금, spec.md 7.3절) ----------
+// 평문 비밀번호는 코드 어디에도 저장하지 않는다. sha256("7200")의 16진수 해시값만 상수로 둔다.
+const PASSWORD_HASH = '3c5d8ca315f8c36d4cd4beecbc55b34c92a2d6eb1df730908df6f23dd2aa08f7';
+// 잠금 해제 상태는 세션 종료(탭 닫기) 시 사라지도록 sessionStorage에 저장한다(공용 PC 대응, spec.md 7.3절 참고).
+const UNLOCK_SESSION_KEY = 'company-portal-unlocked';
+
+// 사용자가 입력한 문자열을 SHA-256으로 해시해 16진수 문자열로 반환한다(Web Crypto API, 외부 라이브러리 불필요).
+async function sha256Hex(text) {
+  const encoded = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// 입력값의 해시가 PASSWORD_HASH와 일치하는지 비동기로 확인한다.
+async function verifyPassword(input) {
+  const hash = await sha256Hex(input);
+  return hash === PASSWORD_HASH;
+}
+
+function isUnlocked() {
+  return sessionStorage.getItem(UNLOCK_SESSION_KEY) === 'true';
+}
+
+function setUnlocked() {
+  sessionStorage.setItem(UNLOCK_SESSION_KEY, 'true');
+}
+
+function lockAgain() {
+  sessionStorage.removeItem(UNLOCK_SESSION_KEY);
+}
+
 // ---------- 현장 진행 단계 상수 ----------
 
 const SITE_STAGES = [
