@@ -11,6 +11,10 @@
 
   // ---------- 요소 참조 ----------
   const themeToggle = document.getElementById('theme-toggle');
+  const desktopShortcutBtn = document.getElementById('desktop-shortcut-btn');
+  const installGuideOverlay = document.getElementById('install-guide-overlay');
+  const installGuideClose = document.getElementById('install-guide-close');
+  const installGuideOkBtn = document.getElementById('install-guide-ok-btn');
   const guideBox = document.getElementById('guide-box');
   const guideToggle = document.getElementById('guide-toggle');
   const guideContent = document.getElementById('guide-content');
@@ -410,6 +414,49 @@
     });
   }
 
+  // ---------- 바탕화면에 설치(PWA) ----------
+
+  let deferredInstallPrompt = null;
+
+  function openInstallGuide() {
+    installGuideOverlay.hidden = false;
+  }
+
+  function closeInstallGuide() {
+    installGuideOverlay.hidden = true;
+  }
+
+  function initInstallPrompt() {
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+    });
+
+    desktopShortcutBtn.addEventListener('click', async () => {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        try {
+          await deferredInstallPrompt.userChoice;
+        } catch (err) {
+          // 사용자가 설치 대화상자를 닫은 경우 등 — 무시
+        }
+        deferredInstallPrompt = null;
+      } else {
+        openInstallGuide();
+      }
+    });
+
+    installGuideClose.addEventListener('click', closeInstallGuide);
+    installGuideOkBtn.addEventListener('click', closeInstallGuide);
+    installGuideOverlay.addEventListener('click', (event) => {
+      if (event.target === installGuideOverlay) closeInstallGuide();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+    });
+  }
+
   // ---------- 접근 제어(비밀번호 잠금) ----------
 
   let lastFocusedElBeforePasswordModal = null;
@@ -516,6 +563,7 @@
 
   function init() {
     initTheme();
+    initInstallPrompt();
     initGuideBox();
     initAccessControl();
     populateStageSelect();
