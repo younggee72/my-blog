@@ -41,6 +41,13 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDate(isoString) {
+  if (!isoString) return '알 수 없음';
+  const d = new Date(isoString);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+}
+
 // ---------- DOM 참조 ----------
 
 function roomEls(room) {
@@ -210,27 +217,43 @@ function renderFileList(room, items) {
   }
   emptyMsg.hidden = true;
 
-  items.forEach((item) => {
-    const card = el('div', { className: 'file-card' });
+  const wrap = el('div', { className: 'file-table-wrap' });
+  const table = el('table', { className: 'file-table' });
 
-    const nameEl = el('p', { className: 'file-card-name', text: item.name });
-    const uploadedDate = item.uploadedAt ? new Date(item.uploadedAt).toLocaleString('ko-KR') : '알 수 없음';
-    const metaEl = el('p', { className: 'file-card-meta', text: `${formatBytes(item.size)} · ${uploadedDate}` });
+  const thead = el('thead');
+  const headRow = el('tr');
+  ['번호', '제목', '파일크기', '업로드일시', '다운로드', '삭제'].forEach((text) => {
+    headRow.appendChild(el('th', { text }));
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
 
-    const actions = el('div', { className: 'file-card-actions' });
+  const tbody = el('tbody');
+  items.forEach((item, index) => {
+    const row = el('tr');
+    row.appendChild(el('td', { className: 'file-table-num', text: String(index + 1) }));
+    row.appendChild(el('td', { className: 'file-table-name', text: item.name }));
+    row.appendChild(el('td', { className: 'file-table-size', text: formatBytes(item.size) }));
+    row.appendChild(el('td', { className: 'file-table-date', text: formatDate(item.uploadedAt) }));
+
+    const downloadCell = el('td', { className: 'file-table-action' });
     const downloadBtn = el('button', { className: 'btn btn-secondary', text: '다운로드', attrs: { type: 'button' } });
     downloadBtn.addEventListener('click', () => downloadFile(item));
+    downloadCell.appendChild(downloadBtn);
+    row.appendChild(downloadCell);
+
+    const deleteCell = el('td', { className: 'file-table-action' });
     const deleteBtn = el('button', { className: 'btn btn-danger', text: '삭제', attrs: { type: 'button' } });
     deleteBtn.addEventListener('click', () => deleteFile(room, item));
+    deleteCell.appendChild(deleteBtn);
+    row.appendChild(deleteCell);
 
-    actions.appendChild(downloadBtn);
-    actions.appendChild(deleteBtn);
-
-    card.appendChild(nameEl);
-    card.appendChild(metaEl);
-    card.appendChild(actions);
-    fileList.appendChild(card);
+    tbody.appendChild(row);
   });
+  table.appendChild(tbody);
+
+  wrap.appendChild(table);
+  fileList.appendChild(wrap);
 }
 
 // ---------- 다운로드/삭제 ----------

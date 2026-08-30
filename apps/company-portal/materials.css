@@ -319,45 +319,54 @@ a {
   padding: 0.6rem 0.8rem;
 }
 
-/* ---------- 파일 카드 목록 ---------- */
-.file-card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 0.85rem;
+/* ---------- 파일 목록(표) ---------- */
+.file-list {
   margin-bottom: 1rem;
 }
 
-.file-card {
-  background: var(--color-bg-secondary);
+.file-table-wrap {
+  overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  padding: 0.9rem 1rem;
 }
 
-.file-card-name {
-  font-weight: 700;
-  font-size: 0.98rem;
-  margin: 0 0 0.35rem;
-  word-break: break-all;
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  white-space: nowrap;
 }
 
-.file-card-meta {
-  font-size: 0.8rem;
+.file-table th,
+.file-table td {
+  border: 1px solid var(--color-border);
+  padding: 0.55rem 0.7rem;
+  text-align: center;
+}
+
+.file-table thead th {
+  background: var(--color-bg-secondary);
   color: var(--color-text-secondary);
-  margin-bottom: 0.75rem;
+  font-weight: 700;
 }
 
-.file-card-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+.file-table tbody tr:hover {
+  background: var(--color-bg-secondary);
 }
 
-.file-card-actions .btn {
-  flex: 1;
-  min-width: 88px;
-  padding: 0.5rem 0.7rem;
-  font-size: 0.85rem;
+.file-table-name {
+  text-align: left;
+  font-weight: 600;
+  white-space: normal;
+  word-break: break-all;
+  min-width: 160px;
+}
+
+.file-table-action .btn {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  min-height: 36px;
+  white-space: nowrap;
 }
 
 .empty-msg {
@@ -368,10 +377,6 @@ a {
 
 /* ---------- 반응형 ---------- */
 @media (max-width: 640px) {
-  .file-card-list {
-    grid-template-columns: 1fr;
-  }
-
   .header-btn {
     padding: 0.5rem 0.65rem;
   }
