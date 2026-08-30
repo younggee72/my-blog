@@ -5,7 +5,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getStorage, ref, uploadBytesResumable, uploadBytes, listAll,
-  getMetadata, getDownloadURL, deleteObject
+  getMetadata, getDownloadURL, deleteObject, getBytes
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
@@ -409,7 +409,7 @@ function renderFileList(items) {
 
   const thead = el('thead');
   const headRow = el('tr');
-  ['번호', '제목', '파일크기', '업로드일시', '다운로드', '삭제'].forEach((text) => {
+  ['번호', '제목', '파일크기', '업로드일시', '다운로드', '압축 풀기', '삭제'].forEach((text) => {
     headRow.appendChild(el('th', { text }));
   });
   thead.appendChild(headRow);
@@ -429,6 +429,14 @@ function renderFileList(items) {
     downloadCell.appendChild(downloadBtn);
     row.appendChild(downloadCell);
 
+    const extractCell = el('td', { className: 'file-table-action' });
+    if (/\.zip$/i.test(item.name)) {
+      const extractBtn = el('button', { className: 'btn btn-secondary', text: '압축 풀기', attrs: { type: 'button' } });
+      extractBtn.addEventListener('click', () => extractZip(item));
+      extractCell.appendChild(extractBtn);
+    }
+    row.appendChild(extractCell);
+
     const deleteCell = el('td', { className: 'file-table-action' });
     const deleteBtn = el('button', { className: 'btn btn-danger', text: '삭제', attrs: { type: 'button' } });
     deleteBtn.addEventListener('click', () => deleteFile(item));
@@ -443,10 +451,54 @@ function renderFileList(items) {
   els.fileList.appendChild(wrap);
 }
 
-// ---------- 다운로드/삭제 ----------
+// ---------- 다운로드/압축 풀기/삭제 ----------
 
 function downloadFile(item) {
   window.open(item.url, '_blank');
+}
+
+async function extractZip(item) {
+  const folderName = item.name.replace(/\.zip$/i, '') || 'extracted';
+  const ok = confirm(
+    `"${item.name}"의 압축을 풀어서 같은 위치의 "${folderName}" 폴더 안에 개별 파일로 저장하시겠습니까?\n` +
+    `(원본 zip 파일은 그대로 남습니다)`
+  );
+  if (!ok) return;
+
+  clearError();
+  const key = `extract-${Date.now()}`;
+  showProgressUI(key, `${item.name} 압축 해제 중…`, 0);
+
+  try {
+    const zipBytes = await getBytes(ref(storage, item.path));
+    const zip = await JSZip.loadAsync(zipBytes);
+    const entries = Object.values(zip.files).filter((f) => !f.dir);
+
+    if (entries.length === 0) {
+      hideProgressUI(key);
+      showError('압축 파일 안에 내용이 없습니다.');
+      return;
+    }
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const content = await entry.async('uint8array');
+      // 일부 Windows 압축 도구(예: PowerShell Compress-Archive)는 zip 내부
+      // 경로 구분자로 "\"를 쓴다(표준은 "/") — 폴더로 안 나뉘고 파일명에
+      // 그대로 "\"가 들어가버리는 걸 막기 위해 항상 "/"로 정규화한다.
+      const entryPath = entry.name.replace(/\\/g, '/');
+      const destRef = ref(currentRef(), `${folderName}/${entryPath}`);
+      await uploadBytes(destRef, content);
+      updateProgressUI(key, `${item.name} 압축 해제 중…`, Math.round(((i + 1) / entries.length) * 100));
+    }
+
+    hideProgressUI(key);
+    await refreshExplorer();
+  } catch (err) {
+    console.warn(`[materials] 압축 풀기 실패(${item.path})`, err);
+    hideProgressUI(key);
+    showError(`압축 풀기 실패: ${err.message}`);
+  }
 }
 
 async function deleteFile(item) {
