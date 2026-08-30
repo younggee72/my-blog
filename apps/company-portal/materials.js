@@ -1,9 +1,9 @@
-// materials.js — 업무자료실: Firebase Storage 초기화 + 업로드/목록/다운로드/삭제 로직 + 렌더링
+// materials.js — 업무자료실: Firebase Storage 초기화 + 폴더/업로드/목록/다운로드/삭제 로직 + 렌더링
 // (spec.md 8장 참고). ES 모듈로 로드된다 (index.html/portal.js/app.js와는 완전히 분리된 페이지).
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getStorage, ref, uploadBytesResumable, listAll,
+  getStorage, ref, uploadBytesResumable, uploadBytes, listAll,
   getMetadata, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
@@ -22,12 +22,23 @@ const storage = getStorage(app);
 
 const ROOMS = ['construction', 'safety'];
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
+const KEEP_FILE = '.keep'; // 빈 폴더를 표현하기 위한 0바이트 placeholder 파일명
+
+// 방(room)별로 현재 열려있는 폴더. null이면 "미분류"(폴더 없이 방 최상위에 있는 파일).
+const state = {
+  construction: { folder: null },
+  safety: { folder: null },
+};
 
 // ---------- 경로/이름 헬퍼 ----------
 
-function buildStoragePath(room, file) {
+function folderStoragePath(room, folder) {
+  return folder ? `${room}/${folder}` : room;
+}
+
+function buildStoragePath(room, folder, file) {
   const prefixed = `${Date.now()}_${file.name}`;
-  return `${room}/${prefixed}`;
+  return `${folderStoragePath(room, folder)}/${prefixed}`;
 }
 
 function displayName(storagePath) {
@@ -61,7 +72,21 @@ function roomEls(room) {
   };
 }
 
-// XSS 방지: 파일명 등 사용자 입력값은 textContent로만 DOM에 넣는다.
+function folderEls(room) {
+  return {
+    folderView: document.getElementById(`folder-view-${room}`),
+    folderList: document.getElementById(`folder-list-${room}`),
+    folderErrorMsg: document.getElementById(`folder-error-msg-${room}`),
+    newFolderInput: document.getElementById(`new-folder-input-${room}`),
+    newFolderBtn: document.getElementById(`new-folder-btn-${room}`),
+    fileView: document.getElementById(`file-view-${room}`),
+    folderLabel: document.getElementById(`current-folder-label-${room}`),
+    backBtn: document.getElementById(`back-btn-${room}`),
+    deleteFolderBtn: document.getElementById(`delete-folder-btn-${room}`),
+  };
+}
+
+// XSS 방지: 파일명/폴더명 등 사용자 입력값은 textContent로만 DOM에 넣는다.
 function el(tag, opts) {
   const node = document.createElement(tag);
   if (opts) {
@@ -84,6 +109,18 @@ function clearError(room) {
   const { errorMsg } = roomEls(room);
   errorMsg.hidden = true;
   errorMsg.textContent = '';
+}
+
+function showFolderError(room, message) {
+  const { folderErrorMsg } = folderEls(room);
+  folderErrorMsg.textContent = message;
+  folderErrorMsg.hidden = false;
+}
+
+function clearFolderError(room) {
+  const { folderErrorMsg } = folderEls(room);
+  folderErrorMsg.hidden = true;
+  folderErrorMsg.textContent = '';
 }
 
 // ---------- 업로드 진행률 UI ----------
@@ -138,13 +175,104 @@ function validateFileSize(room, file) {
   return true;
 }
 
+// ---------- 폴더 ----------
+
+async function refreshFolderList(room) {
+  const { folderList } = folderEls(room);
+  folderList.innerHTML = '';
+  try {
+    const roomRef = ref(storage, room);
+    const result = await listAll(roomRef);
+    const folderNames = result.prefixes.map((p) => p.name);
+    const hasUnsortedFiles = result.items.some((item) => item.name !== KEEP_FILE);
+
+    const entries = [];
+    if (hasUnsortedFiles) entries.push({ folder: null, label: '📄 미분류 파일' });
+    folderNames.forEach((name) => entries.push({ folder: name, label: `📁 ${name}` }));
+
+    if (entries.length === 0) {
+      folderList.appendChild(el('p', { className: 'empty-msg', text: '아직 폴더나 파일이 없습니다. 위에서 폴더를 먼저 만들어보세요.' }));
+      return;
+    }
+
+    entries.forEach(({ folder, label }) => {
+      const card = el('button', { className: 'folder-card', text: label, attrs: { type: 'button' } });
+      card.addEventListener('click', () => showFileView(room, folder));
+      folderList.appendChild(card);
+    });
+  } catch (err) {
+    console.warn(`[materials] ${room} 폴더 목록 조회 실패`, err);
+    showFolderError(room, `폴더 목록을 불러오지 못했습니다: ${err.message}`);
+  }
+}
+
+async function createFolder(room, rawName) {
+  const name = rawName.trim();
+  clearFolderError(room);
+  if (!name) {
+    showFolderError(room, '폴더 이름을 입력해주세요.');
+    return;
+  }
+  if (name.includes('/')) {
+    showFolderError(room, '폴더 이름에 "/"는 사용할 수 없습니다.');
+    return;
+  }
+  try {
+    const keepRef = ref(storage, `${room}/${name}/${KEEP_FILE}`);
+    await uploadBytes(keepRef, new Uint8Array());
+    folderEls(room).newFolderInput.value = '';
+    refreshFolderList(room);
+  } catch (err) {
+    console.warn(`[materials] ${room} 폴더 생성 실패`, err);
+    showFolderError(room, `폴더 생성 실패: ${err.message}`);
+  }
+}
+
+async function deleteFolder(room) {
+  const folder = state[room].folder;
+  if (!folder) return;
+  const ok = confirm(`"${folder}" 폴더와 그 안의 모든 파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`);
+  if (!ok) return;
+  try {
+    const folderRef = ref(storage, folderStoragePath(room, folder));
+    const result = await listAll(folderRef);
+    await Promise.all(result.items.map((itemRef) => deleteObject(itemRef)));
+    showFolderListView(room);
+  } catch (err) {
+    console.warn(`[materials] ${room} 폴더 삭제 실패`, err);
+    showError(room, `폴더 삭제 실패: ${err.message}`);
+  }
+}
+
+// ---------- 화면 전환(폴더 목록 ↔ 폴더 안 파일) ----------
+
+function showFolderListView(room) {
+  const { folderView, fileView } = folderEls(room);
+  folderView.hidden = false;
+  fileView.hidden = true;
+  state[room].folder = null;
+  refreshFolderList(room);
+}
+
+function showFileView(room, folder) {
+  state[room].folder = folder;
+  const { folderView, fileView, folderLabel, deleteFolderBtn } = folderEls(room);
+  folderView.hidden = true;
+  fileView.hidden = false;
+  folderLabel.textContent = folder ? `📁 ${folder}` : '📄 미분류 파일';
+  deleteFolderBtn.hidden = !folder;
+  clearError(room);
+  refreshFileList(room);
+}
+
 // ---------- 업로드 ----------
 
 function uploadFile(room, file) {
   clearError(room);
   if (!validateFileSize(room, file)) return;
 
-  const path = buildStoragePath(room, file);
+  const folder = state[room].folder;
+  const path = buildStoragePath(room, folder, file);
   const fileRef = ref(storage, path);
   const task = uploadBytesResumable(fileRef, file);
   const key = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -173,28 +301,31 @@ function uploadFile(room, file) {
 
 async function refreshFileList(room) {
   const { fileList, emptyMsg } = roomEls(room);
+  const folder = state[room].folder;
   try {
-    const folderRef = ref(storage, room);
+    const folderRef = ref(storage, folderStoragePath(room, folder));
     const result = await listAll(folderRef);
 
-    const items = await Promise.all(result.items.map(async (itemRef) => {
-      try {
-        const [meta, url] = await Promise.all([
-          getMetadata(itemRef),
-          getDownloadURL(itemRef)
-        ]);
-        return {
-          path: itemRef.fullPath,
-          name: displayName(itemRef.name),
-          size: meta.size,
-          uploadedAt: meta.timeCreated,
-          url
-        };
-      } catch (err) {
-        console.warn(`[materials] 파일 메타데이터 조회 실패(${itemRef.fullPath})`, err);
-        return null;
-      }
-    }));
+    const items = await Promise.all(result.items
+      .filter((itemRef) => itemRef.name !== KEEP_FILE)
+      .map(async (itemRef) => {
+        try {
+          const [meta, url] = await Promise.all([
+            getMetadata(itemRef),
+            getDownloadURL(itemRef)
+          ]);
+          return {
+            path: itemRef.fullPath,
+            name: displayName(itemRef.name),
+            size: meta.size,
+            uploadedAt: meta.timeCreated,
+            url
+          };
+        } catch (err) {
+          console.warn(`[materials] 파일 메타데이터 조회 실패(${itemRef.fullPath})`, err);
+          return null;
+        }
+      }));
 
     const validItems = items.filter((it) => it !== null);
     validItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
@@ -290,6 +421,20 @@ function bindUpload(room) {
   });
 }
 
+// ---------- 폴더 버튼/입력 바인딩 ----------
+
+function bindFolderControls(room) {
+  const { newFolderInput, newFolderBtn, backBtn, deleteFolderBtn } = folderEls(room);
+
+  newFolderBtn.addEventListener('click', () => createFolder(room, newFolderInput.value));
+  newFolderInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') createFolder(room, newFolderInput.value);
+  });
+
+  backBtn.addEventListener('click', () => showFolderListView(room));
+  deleteFolderBtn.addEventListener('click', () => deleteFolder(room));
+}
+
 // ---------- 탭 전환 ----------
 
 function bindTabs() {
@@ -375,7 +520,8 @@ function init() {
   bindTabs();
   ROOMS.forEach((room) => {
     bindUpload(room);
-    refreshFileList(room);
+    bindFolderControls(room);
+    refreshFolderList(room);
   });
 }
 

@@ -27,6 +27,7 @@
       <li>이 페이지에 업로드한 파일은 브라우저 로컬 저장이 아니라 <strong>모든 방문자가 접근 가능한 공유 저장소(Firebase Storage)</strong>에 저장되며, 같은 링크로 접속하는 모든 직원이 함께 봅니다.</li>
       <li>이 링크(URL)를 아는 사람은 누구나 업로드·다운로드·삭제가 가능한 수준의 보안입니다 — 회사 홈페이지의 비밀번호 잠금(7200)과 같은 성격의 트레이드오프로, 완전한 보안 장치가 아닙니다.</li>
       <li>파일 1개당 최대 200MB까지 업로드할 수 있습니다.</li>
+      <li>📁 폴더를 만들어 자료를 주제별·내용별로 나눠 정리할 수 있습니다. 폴더 이름을 입력하고 "폴더 만들기"를 누른 뒤 폴더를 클릭해 들어가면, 그 폴더 안에 파일을 업로드/조회할 수 있습니다.</li>
     </ul>
   </div>
 </section>
@@ -40,28 +41,68 @@
 
   <!-- ================= 공사자료 ================= -->
   <section id="room-construction" class="room-panel" role="tabpanel" aria-labelledby="tab-construction">
-    <div class="upload-area">
-      <input id="upload-input-construction" class="upload-input" type="file">
-      <button id="upload-btn-construction" class="btn btn-primary" type="button" data-room="construction">업로드</button>
-    </div>
-    <div id="upload-progress-construction" class="upload-progress-list"></div>
-    <p id="error-msg-construction" class="error-msg" hidden></p>
 
-    <div id="file-list-construction" class="file-list"></div>
-    <p id="empty-msg-construction" class="empty-msg" hidden>아직 업로드된 파일이 없습니다.</p>
+    <!-- 폴더 목록 화면 -->
+    <div id="folder-view-construction">
+      <div id="new-folder-area-construction" class="new-folder-area">
+        <input id="new-folder-input-construction" class="upload-input" type="text" placeholder="새 폴더 이름 (예: 전기공사)">
+        <button id="new-folder-btn-construction" class="btn btn-secondary" type="button" data-room="construction">📁 폴더 만들기</button>
+      </div>
+      <p id="folder-error-msg-construction" class="error-msg" hidden></p>
+      <div id="folder-list-construction" class="folder-grid"></div>
+    </div>
+
+    <!-- 폴더 안 파일 화면 -->
+    <div id="file-view-construction" class="file-view" hidden>
+      <div class="file-view-head">
+        <button id="back-btn-construction" class="btn btn-secondary" type="button">← 폴더 목록</button>
+        <h3 id="current-folder-label-construction" class="current-folder-label"></h3>
+        <button id="delete-folder-btn-construction" class="btn btn-danger" type="button" hidden>폴더 삭제</button>
+      </div>
+
+      <div class="upload-area">
+        <input id="upload-input-construction" class="upload-input" type="file">
+        <button id="upload-btn-construction" class="btn btn-primary" type="button" data-room="construction">업로드</button>
+      </div>
+      <div id="upload-progress-construction" class="upload-progress-list"></div>
+      <p id="error-msg-construction" class="error-msg" hidden></p>
+
+      <div id="file-list-construction" class="file-list"></div>
+      <p id="empty-msg-construction" class="empty-msg" hidden>아직 업로드된 파일이 없습니다.</p>
+    </div>
   </section>
 
   <!-- ================= 안전자료 ================= -->
   <section id="room-safety" class="room-panel" role="tabpanel" aria-labelledby="tab-safety" hidden>
-    <div class="upload-area">
-      <input id="upload-input-safety" class="upload-input" type="file">
-      <button id="upload-btn-safety" class="btn btn-primary" type="button" data-room="safety">업로드</button>
-    </div>
-    <div id="upload-progress-safety" class="upload-progress-list"></div>
-    <p id="error-msg-safety" class="error-msg" hidden></p>
 
-    <div id="file-list-safety" class="file-list"></div>
-    <p id="empty-msg-safety" class="empty-msg" hidden>아직 업로드된 파일이 없습니다.</p>
+    <!-- 폴더 목록 화면 -->
+    <div id="folder-view-safety">
+      <div id="new-folder-area-safety" class="new-folder-area">
+        <input id="new-folder-input-safety" class="upload-input" type="text" placeholder="새 폴더 이름 (예: 안전교육)">
+        <button id="new-folder-btn-safety" class="btn btn-secondary" type="button" data-room="safety">📁 폴더 만들기</button>
+      </div>
+      <p id="folder-error-msg-safety" class="error-msg" hidden></p>
+      <div id="folder-list-safety" class="folder-grid"></div>
+    </div>
+
+    <!-- 폴더 안 파일 화면 -->
+    <div id="file-view-safety" class="file-view" hidden>
+      <div class="file-view-head">
+        <button id="back-btn-safety" class="btn btn-secondary" type="button">← 폴더 목록</button>
+        <h3 id="current-folder-label-safety" class="current-folder-label"></h3>
+        <button id="delete-folder-btn-safety" class="btn btn-danger" type="button" hidden>폴더 삭제</button>
+      </div>
+
+      <div class="upload-area">
+        <input id="upload-input-safety" class="upload-input" type="file">
+        <button id="upload-btn-safety" class="btn btn-primary" type="button" data-room="safety">업로드</button>
+      </div>
+      <div id="upload-progress-safety" class="upload-progress-list"></div>
+      <p id="error-msg-safety" class="error-msg" hidden></p>
+
+      <div id="file-list-safety" class="file-list"></div>
+      <p id="empty-msg-safety" class="empty-msg" hidden>아직 업로드된 파일이 없습니다.</p>
+    </div>
   </section>
 
 </main>

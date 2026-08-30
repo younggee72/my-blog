@@ -247,6 +247,60 @@ a {
   outline-offset: -2px;
 }
 
+/* ---------- 폴더 ---------- */
+.new-folder-area {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.new-folder-area .upload-input {
+  flex: 1 1 220px;
+}
+
+.folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.folder-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1.1rem 0.9rem;
+  min-height: 44px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.folder-card:hover {
+  border-color: var(--color-accent);
+}
+
+.file-view-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.current-folder-label {
+  margin: 0;
+  font-size: 1.02rem;
+  flex: 1 1 auto;
+}
+
 /* ---------- 업로드 영역 ---------- */
 .upload-area {
   display: flex;
