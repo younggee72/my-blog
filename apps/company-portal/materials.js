@@ -71,6 +71,7 @@ const els = {
   folderList: document.getElementById('folder-list'),
   input: document.getElementById('upload-input'),
   uploadBtn: document.getElementById('upload-btn'),
+  uploadCancelBtn: document.getElementById('upload-cancel-btn'),
   progressList: document.getElementById('upload-progress'),
   errorMsg: document.getElementById('error-msg'),
   fileList: document.getElementById('file-list'),
@@ -463,6 +464,17 @@ function bindControls() {
     }
     uploadFile(file);
     els.input.value = '';
+    els.uploadCancelBtn.hidden = true;
+  });
+
+  els.input.addEventListener('change', () => {
+    const hasFile = !!(els.input.files && els.input.files[0]);
+    els.uploadCancelBtn.hidden = !hasFile;
+  });
+
+  els.uploadCancelBtn.addEventListener('click', () => {
+    els.input.value = '';
+    els.uploadCancelBtn.hidden = true;
   });
 
   els.newFolderBtn.addEventListener('click', () => createFolder(els.newFolderInput.value));
