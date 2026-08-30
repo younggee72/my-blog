@@ -208,10 +208,90 @@
     var dict = loadSavedProjects();
     dict[name] = projectState;
     saveSavedProjects(dict);
+    pushProjectToCloud(name, projectState);
   }
 
   function getSavedProjectNames() {
     return Object.keys(loadSavedProjects());
+  }
+
+  // ---------------------------------------------------------------------
+  // 클라우드 동기화(Firestore) — 정산서를 "이 브라우저에만"이 아니라
+  // 회사 공유 저장소에 올려서, 비밀번호로 들어온 관계자라면 어느 기기에서든
+  // 같은 정산서 목록을 보고 불러올 수 있게 한다.
+  //
+  // 기존 동기(synchronous) API(loadSavedProjects/saveProjectByName/
+  // getSavedProjectNames)는 settlement.js/invoices.js 여러 곳에서 이미
+  // 동기적으로 쓰고 있어 전부 async로 바꾸면 손댈 곳이 너무 많아진다.
+  // 대신 "로컬은 그대로 즉시 저장 + 백그라운드로 클라우드에도 반영"
+  // (push) 하고, 화면이 열릴 때 한 번 "클라우드 → 로컬" 병합(pull)을
+  // 먼저 끝낸 뒤에 그 다음부터는 기존 동기 API를 그대로 쓰는 방식으로
+  // 최소 침습적으로 붙인다.
+  // ---------------------------------------------------------------------
+  var firestoreCtxPromise = null;
+  function getFirestoreCtx() {
+    if (!firestoreCtxPromise) {
+      firestoreCtxPromise = Promise.all([
+        import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+        import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
+      ]).then(function (mods) {
+        var appMod = mods[0];
+        var fsMod = mods[1];
+        var firebaseConfig = {
+          apiKey: 'AIzaSyAdyXmaN_rgxG_eCFA8jnuzvQabL8thLFk',
+          authDomain: 'jicheon-construction.firebaseapp.com',
+          projectId: 'jicheon-construction',
+          storageBucket: 'jicheon-construction.firebasestorage.app',
+          messagingSenderId: '79554524630',
+          appId: '1:79554524630:web:67a2588607f85984c82077'
+        };
+        var app = appMod.initializeApp(firebaseConfig, 'settlement-cloud');
+        var db = fsMod.getFirestore(app);
+        return { db: db, fs: fsMod };
+      });
+    }
+    return firestoreCtxPromise;
+  }
+
+  // Firestore 문서 ID는 "/" 등 일부 문자를 쓸 수 없으므로 안전한 값으로 치환한다.
+  function sanitizeDocId(name) {
+    var id = String(name).replace(/[\/\.#$\[\]]/g, '_').slice(0, 300);
+    return id || 'unnamed';
+  }
+
+  // 정산서 하나를 클라우드에 올린다(실패해도 화면 동작은 막지 않는다 — fire-and-forget).
+  function pushProjectToCloud(name, projectState) {
+    getFirestoreCtx().then(function (ctx) {
+      var docRef = ctx.fs.doc(ctx.db, 'settlements', sanitizeDocId(name));
+      return ctx.fs.setDoc(docRef, {
+        name: name,
+        state: projectState,
+        updatedAt: Date.now()
+      });
+    }).catch(function (err) {
+      console.warn('[settlement] 클라우드 저장 실패(' + name + ')', err);
+    });
+  }
+
+  // 클라우드에 있는 정산서 전체를 받아와 로컬 저장소에 병합한다.
+  // 화면이 열릴 때 한 번 호출해 다른 기기/사람이 올린 정산서를 반영한다.
+  function pullProjectsFromCloud() {
+    return getFirestoreCtx().then(function (ctx) {
+      return ctx.fs.getDocs(ctx.fs.collection(ctx.db, 'settlements'));
+    }).then(function (snap) {
+      var dict = loadSavedProjects();
+      snap.forEach(function (docSnap) {
+        var data = docSnap.data();
+        if (data && data.name && data.state) {
+          dict[data.name] = data.state;
+        }
+      });
+      saveSavedProjects(dict);
+      return dict;
+    }).catch(function (err) {
+      console.warn('[settlement] 클라우드 목록 조회 실패', err);
+      return loadSavedProjects();
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -420,6 +500,8 @@
     saveSavedProjects: saveSavedProjects,
     saveProjectByName: saveProjectByName,
     getSavedProjectNames: getSavedProjectNames,
+    pushProjectToCloud: pushProjectToCloud,
+    pullProjectsFromCloud: pullProjectsFromCloud,
 
     LAST_SEEN_VERSION_KEY: LAST_SEEN_VERSION_KEY,
     APP_CHANGELOG: APP_CHANGELOG,

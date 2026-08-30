@@ -1590,5 +1590,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   tryReconnectFolder();
 
-  renderInvoiceTable();
+  // 화면을 그리기 전에 클라우드(다른 기기/담당자가 저장한 정산서)를 먼저
+  // 로컬 저장소에 병합한다(공사명 자동완성/필터 목록에 반영하기 위해).
+  SettlementShared.pullProjectsFromCloud().then(function () {
+    renderInvoiceTable();
+  });
 });

@@ -1208,6 +1208,11 @@
     }
     tryReconnectFolder();
 
-    renderAll();
+    // 화면을 그리기 전에 클라우드(다른 기기/담당자가 저장한 정산서)를 먼저
+    // 로컬 저장소에 병합한다. 실패해도(오프라인 등) 로컬 데이터로 그린다
+    // (pullProjectsFromCloud 내부에서 실패를 흡수하므로 항상 resolve됨).
+    SettlementShared.pullProjectsFromCloud().then(function () {
+      renderAll();
+    });
   });
 })();
