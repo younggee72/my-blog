@@ -157,6 +157,37 @@
     document.getElementById('project-total').textContent = formatNumber(total);
 
     populateProjectPicker();
+    renderCompleteStatus();
+  }
+
+  // ---------------------------------------------------------------------
+  // 정산 완료 처리
+  // ---------------------------------------------------------------------
+  function renderCompleteStatus() {
+    var badge = document.getElementById('complete-status-badge');
+    var btn = document.getElementById('btn-toggle-complete');
+    if (!badge || !btn) return;
+    badge.hidden = !state.completed;
+    btn.textContent = state.completed ? '↩️ 완료 취소(진행중으로)' : '✅ 정산 완료 처리';
+    btn.classList.toggle('is-completed', !!state.completed);
+  }
+
+  function toggleComplete() {
+    if (!state.projectInfo.name) {
+      alert('공사명을 먼저 입력해주세요.');
+      return;
+    }
+    var next = !state.completed;
+    var ok = confirm(
+      next
+        ? '"' + state.projectInfo.name + '" 정산서를 완료 처리하시겠습니까?\n완료된 정산서는 "완료정산서" 탭으로 옮겨지고, 이 화면의 "저장된 정산서 불러오기" 목록에서는 빠집니다.'
+        : '"' + state.projectInfo.name + '" 정산서를 다시 진행중으로 되돌리시겠습니까?'
+    );
+    if (!ok) return;
+    state.completed = next;
+    saveToLocalStorage();
+    renderCompleteStatus();
+    populateProjectPicker();
   }
 
   // ---------------------------------------------------------------------
@@ -170,7 +201,7 @@
   function populateProjectPicker() {
     var select = document.getElementById('project-picker');
     if (!select) return;
-    var names = SettlementShared.getSavedProjectNames().sort(function (a, b) {
+    var names = SettlementShared.getActiveProjectNames().sort(function (a, b) {
       return a.localeCompare(b, 'ko');
     });
     var html = '<option value="">불러올 정산서 선택…</option>';
@@ -991,6 +1022,8 @@
       renderAll();
     });
 
+    document.getElementById('btn-toggle-complete').addEventListener('click', toggleComplete);
+
     document.getElementById('btn-export').addEventListener('click', exportToExcel);
 
     var themeBtn = document.getElementById('theme-toggle');
@@ -1208,10 +1241,20 @@
     }
     tryReconnectFolder();
 
+    // "완료정산서" 탭에서 "수정"을 눌러 넘어온 경우, 그 공사명의 정산서를
+    // 불러와서 편집 화면에 띄운다(완료 상태는 그대로 유지 — 완료 취소는
+    // 아래 "완료 취소" 버튼으로 사용자가 직접 선택해야 한다).
+    var editTarget = sessionStorage.getItem('settlement-edit-target');
+    if (editTarget) sessionStorage.removeItem('settlement-edit-target');
+
     // 화면을 그리기 전에 클라우드(다른 기기/담당자가 저장한 정산서)를 먼저
     // 로컬 저장소에 병합한다. 실패해도(오프라인 등) 로컬 데이터로 그린다
     // (pullProjectsFromCloud 내부에서 실패를 흡수하므로 항상 resolve됨).
     SettlementShared.pullProjectsFromCloud().then(function () {
+      if (editTarget) {
+        var saved = SettlementShared.loadSavedProjects();
+        if (saved[editTarget]) state = normalizeState(saved[editTarget]);
+      }
       renderAll();
     });
   });

@@ -1283,7 +1283,7 @@ function renderProjectSuggestions() {
   if (!datalist) return;
   var names = {};
   state.invoices.forEach(function (r) { if (r.projectName) names[r.projectName] = true; });
-  SettlementShared.getSavedProjectNames().forEach(function (n) { names[n] = true; });
+  SettlementShared.getActiveProjectNames().forEach(function (n) { names[n] = true; });
   var html = '';
   Object.keys(names).sort(function (a, b) { return a.localeCompare(b, 'ko'); }).forEach(function (name) {
     html += '<option value="' + escapeAttr(name) + '"></option>';

@@ -123,7 +123,8 @@
       account: { bankName: '', accountNumber: '' },
       subcontractNextId: 2,
       laborNextId: 2,
-      etcNextId: 2
+      etcNextId: 2,
+      completed: false
     };
   }
 
@@ -138,7 +139,8 @@
       account: Object.assign({}, empty.account, parsed.account || {}),
       subcontractNextId: parsed.subcontractNextId || empty.subcontractNextId,
       laborNextId: parsed.laborNextId || empty.laborNextId,
-      etcNextId: parsed.etcNextId || empty.etcNextId
+      etcNextId: parsed.etcNextId || empty.etcNextId,
+      completed: !!parsed.completed
     };
   }
 
@@ -213,6 +215,19 @@
 
   function getSavedProjectNames() {
     return Object.keys(loadSavedProjects());
+  }
+
+  // 정산이 끝나지 않은(진행중) 공사명만 — "저장된 정산서 불러오기" 등
+  // 활성 작업 목록에 쓴다.
+  function getActiveProjectNames() {
+    var dict = loadSavedProjects();
+    return Object.keys(dict).filter(function (name) { return !dict[name].completed; });
+  }
+
+  // 정산 완료 처리된 공사명만 — "완료정산서" 탭에 쓴다.
+  function getCompletedProjectNames() {
+    var dict = loadSavedProjects();
+    return Object.keys(dict).filter(function (name) { return !!dict[name].completed; });
   }
 
   // ---------------------------------------------------------------------
@@ -500,6 +515,8 @@
     saveSavedProjects: saveSavedProjects,
     saveProjectByName: saveProjectByName,
     getSavedProjectNames: getSavedProjectNames,
+    getActiveProjectNames: getActiveProjectNames,
+    getCompletedProjectNames: getCompletedProjectNames,
     pushProjectToCloud: pushProjectToCloud,
     pullProjectsFromCloud: pullProjectsFromCloud,
 

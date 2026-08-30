@@ -18,6 +18,7 @@
 <nav class="app-tabs" aria-label="화면 전환" hidden>
   <a href="index.html" class="app-tab is-active" aria-current="page">정산서 작성</a>
   <a href="invoices.html" class="app-tab">계산서함</a>
+  <a href="completed.html" class="app-tab">완료정산서</a>
 </nav>
 
 <main class="container" hidden>
@@ -57,6 +58,10 @@
           <option value="">불러올 정산서 선택…</option>
         </select>
       </label>
+    </div>
+    <div class="complete-status-row">
+      <span id="complete-status-badge" class="complete-status-badge" hidden>✅ 완료된 정산서입니다</span>
+      <button type="button" id="btn-toggle-complete" class="btn-secondary">✅ 정산 완료 처리</button>
     </div>
   </section>
 
@@ -231,7 +236,7 @@
 
 <script src="auth.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="shared-utils.js?v=9"></script>
-<script src="settlement.js?v=8"></script>
+<script src="shared-utils.js?v=10"></script>
+<script src="settlement.js?v=9"></script>
 </body>
 </html>
