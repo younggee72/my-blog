@@ -165,7 +165,15 @@ function validateFileSize(file) {
 
 async function loadRooms() {
   const result = await listAll(ref(storage));
-  rooms = result.prefixes.map((p) => p.name);
+  const fetched = result.prefixes.map((p) => p.name);
+  // "공사자료"/"안전자료"는 회사의 기본 자료실이라, 안이 완전히 비어서
+  // Firebase Storage상 폴더 자체가 사라졌더라도 탭에서는 항상 보이게 한다.
+  const defaults = Object.keys(ROOM_LABELS).filter((name) => !fetched.includes(name));
+  rooms = defaults.concat(fetched);
+  defaults.forEach((name) => {
+    const keepRef = ref(storage, `${name}/${KEEP_FILE}`);
+    uploadBytes(keepRef, new Uint8Array()).catch(() => {});
+  });
   if (!activeRoom || !rooms.includes(activeRoom)) {
     activeRoom = rooms[0] || null;
     subPath = [];
