@@ -248,6 +248,43 @@ a {
 }
 
 /* ---------- 폴더 ---------- */
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+  font-size: 0.92rem;
+}
+
+.breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.3rem;
+  color: var(--color-accent);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-current {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.3rem;
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: default;
+}
+
+.breadcrumb-sep {
+  color: var(--color-text-secondary);
+}
+
 .new-folder-area {
   display: flex;
   flex-wrap: wrap;
@@ -285,20 +322,6 @@ a {
 
 .folder-card:hover {
   border-color: var(--color-accent);
-}
-
-.file-view-head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.current-folder-label {
-  margin: 0;
-  font-size: 1.02rem;
-  flex: 1 1 auto;
 }
 
 /* ---------- 업로드 영역 ---------- */
