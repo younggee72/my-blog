@@ -21,7 +21,7 @@ const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
 const ROOMS = ['construction', 'safety'];
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
 
 // ---------- 경로/이름 헬퍼 ----------
 
@@ -125,7 +125,7 @@ function hideProgressUI(room, key) {
 
 function validateFileSize(room, file) {
   if (file.size > MAX_FILE_SIZE) {
-    showError(room, `"${file.name}" 파일이 20MB를 초과합니다. (${formatBytes(file.size)}) 20MB 이하 파일만 업로드할 수 있습니다.`);
+    showError(room, `"${file.name}" 파일이 200MB를 초과합니다. (${formatBytes(file.size)}) 200MB 이하 파일만 업로드할 수 있습니다.`);
     return false;
   }
   return true;
