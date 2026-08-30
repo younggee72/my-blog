@@ -238,3 +238,221 @@ vehicle-fleet의 `vehicle-fleet-vehicles`, settlement 쪽 키와는 절대 겹�
 15. `guide-box` 안내 목록에 "🔒 직원 전용 업무 시스템은 비밀번호로 잠겨 있으며, 이는 완전한 보안이 아닌 클라이언트 수준의 가림막입니다" 항목 추가.
 16. 브라우저 확인(정적 서버로 구동, `file://` 직접 열기 금지): (a) 처음 진입 시 공개 랜딩만 보이고 내부 레이어는 DOM상 `hidden`인지, (b) 잘못된 비밀번호 입력 시 에러 표시 및 미통과, (c) "7200" 입력 시 내부 레이어 노출 및 기존 허브 카드/현장 목록이 1~6장과 동일하게 정상 동작하는지, (d) 같은 탭에서 새로고침 시 다시 묻지 않는지, (e) 새 탭에서 같은 URL을 열면 다시 잠기는지(sessionStorage 특성), (f) "다시 잠그기" 클릭 시 즉시 재잠금되는지, (g) 모바일 뷰포트에서 비밀번호 입력 시 숫자 키패드가 뜨는지.
 17. 회귀 확인: 1~6장에서 이미 구현된 현장 CRUD, vehicle-fleet 읽기 전용 연동, 금액 정보 상세 노출 제어, 다크모드가 이번 개편으로 전혀 깨지지 않았는지 재확인. `git diff`로 `apps/company-portal/` 외 파일(다른 앱, 블로그 본체)이 이번 작업으로 전혀 변경되지 않았는지 최종 확인 후 Build 서브에이전트 작업 종료.
+
+---
+
+## 8. 업무자료실(Firebase Storage 연동)
+
+> 이 장은 1~7장(허브 카드 + 진행중인 현장 관리 + 공개 랜딩/비밀번호 잠금, 이미 구현·검증 완료)을 **대체하지 않는다.** 기존 로직/데이터/보안 구조는 전부 그대로 유지한 채, 내부 레이어의 "업무 도구" 허브 카드 3장 중 비활성 placeholder였던 "기타 업무 도구" 카드를 실제 기능("업무자료")으로 교체하는 신규 기능 추가다.
+
+### 8.1 개요
+
+사용자 요청: "기타업무도구 란은 업무자료란으로 수정하고 업무자료방에 들어가면, 1.공사자료 2.안전자료 를 만들어서 각각방에 PDF파일 CAD파일 엑셀파일등을 올릴수 있도록 만들어줘".
+
+이 기능은 **여러 직원이 같은 파일을 실제로 공유**해야 하는 용도(공사 도면, 안전 서류 등)이므로, 브라우저 로컬 저장(localStorage)이 아니라 **실제 클라우드 저장소**가 필요하다. 이를 위해 사용자가 별도로 Firebase 프로젝트(`jicheon-construction`)를 생성하고 Cloud Storage를 활성화했으며, 아래 클라이언트 설정값과 보안 규칙이 이미 준비되어 있다. company-portal은 이 값을 그대로 사용해 Firebase Storage 클라이언트 SDK로 파일 업로드/목록조회/다운로드/삭제 기능을 구현한다. 이 기능만 예외적으로 CDN(Firebase JS SDK, ES 모듈)을 사용한다 — 프로젝트 규칙상 CDN은 허용되어 있다.
+
+### 8.2 파일 구조
+
+```
+apps/company-portal/
+├── materials.html    # (신규) 업무자료실 페이지 — 공사자료/안전자료 두 개의 방(탭 또는 섹션)
+├── materials.css      # (신규) 업무자료실 전용 스타일. style.css의 CSS 변수(:root 재선언부)와
+│                        동일한 값을 그대로 다시 선언해 팔레트/다크모드 일관성 유지
+│                        (style.css에 이어 쓰지 않고 별도 파일로 분리 — 이유는 8.5절 참고)
+├── materials.js       # (신규) Firebase 초기화(ES 모듈 CDN import) + 업로드/목록/다운로드/삭제 로직 + 렌더링
+├── index.html          # (수정) 허브 카드 3번째 항목: "기타 업무 도구"(비활성) → "업무자료"(활성, materials.html 링크)로 교체
+├── style.css            # (변경 없음)
+├── portal.js             # (변경 없음)
+└── app.js                 # (변경 없음)
+```
+
+**파일 구조 판단 근거**: `materials.js`는 Firebase SDK를 ES 모듈로 import해야 하므로 `<script type="module">`로 로드되는데, 기존 `app.js`/`portal.js`는 일반 스크립트(non-module)이고 서로 다른 페이지(index.html vs materials.html)에서 쓰인다. 페이지를 완전히 분리했으므로 CSS도 같은 파일(style.css)에 이어 쓰기보다 `materials.css`로 분리하는 편이 "이 페이지가 무엇을 로드하는지" 명확하고, 기존 style.css를 건드릴 위험(회귀)도 없다. 대신 CSS 변수 값과 다크모드 미디어쿼리 구조는 style.css와 동일하게 맞춘다.
+
+### 8.3 핵심 로직 설계
+
+**Firebase 초기화 (`materials.js` 상단, ES 모듈 CDN import)**
+
+```js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getStorage, ref, uploadBytesResumable, listAll,
+  getMetadata, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAdyXmaN_rgxG_eCFA8jnuzvQabL8thLFk",
+  authDomain: "jicheon-construction.firebaseapp.com",
+  projectId: "jicheon-construction",
+  storageBucket: "jicheon-construction.firebasestorage.app",
+  messagingSenderId: "79554524630",
+  appId: "1:79554524630:web:67a2588607f85984c82077",
+  measurementId: "G-H7P1VFC43Q"
+};
+
+const app = initializeApp(firebaseConfig);
+const storage = getStorage(app);
+```
+
+**폴더 경로 규칙**: 같은 버킷 안에서 폴더 경로로 두 방을 구분한다.
+- 공사자료 → `construction/`
+- 안전자료 → `safety/`
+
+**파일명 충돌 방지**: 업로드 시 원본 파일명 그대로 저장하지 않고, `타임스탬프_원본파일명` 형태로 접두사를 붙인다(예: `1735500000000_배관도면.dwg`). 목록 표시 시에는 접두사를 제거하고 원본 파일명만 사용자에게 보여준다(정규식으로 앞의 `숫자_` 패턴만 분리).
+
+```js
+function buildStoragePath(room, file) {
+  const prefixed = `${Date.now()}_${file.name}`;
+  return `${room}/${prefixed}`; // room: 'construction' | 'safety'
+}
+function displayName(storagePath) {
+  const filename = storagePath.split('/').pop();
+  return filename.replace(/^\d+_/, '');
+}
+```
+
+**클라이언트 사이드 20MB 검증** (업로드 전 반드시 실행, 통과 못하면 `uploadBytesResumable` 호출 자체를 막음):
+
+```js
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+function validateFileSize(file) {
+  if (file.size > MAX_FILE_SIZE) {
+    showError(`"${file.name}" 파일이 20MB를 초과합니다. (${formatBytes(file.size)}) 20MB 이하 파일만 업로드할 수 있습니다.`);
+    return false;
+  }
+  return true;
+}
+```
+
+**업로드 함수 (의사코드)**
+
+```js
+async function uploadFile(room, file) {
+  if (!validateFileSize(file)) return;
+  const path = buildStoragePath(room, file);
+  const fileRef = ref(storage, path);
+  const task = uploadBytesResumable(fileRef, file);
+
+  showProgressUI(room, file.name, 0);
+  task.on('state_changed',
+    snapshot => {
+      const pct = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
+      updateProgressUI(room, file.name, pct);
+    },
+    error => showError(`업로드 실패: ${error.message}`),
+    async () => {
+      hideProgressUI(room, file.name);
+      await refreshFileList(room); // 완료 후 목록 자동 갱신
+    }
+  );
+}
+```
+
+**목록조회 함수 (의사코드)** — 별도 DB(Firestore) 없이 Storage API만으로 구현. 이 프로젝트는 Storage만 설정했고 Firestore는 사용하지 않는다.
+
+```js
+async function refreshFileList(room) {
+  const folderRef = ref(storage, room); // 'construction' 또는 'safety'
+  const result = await listAll(folderRef);
+
+  const items = await Promise.all(result.items.map(async (itemRef) => {
+    const [meta, url] = await Promise.all([
+      getMetadata(itemRef),
+      getDownloadURL(itemRef)
+    ]);
+    return {
+      path: itemRef.fullPath,
+      name: displayName(itemRef.name),
+      size: meta.size,               // bytes
+      uploadedAt: meta.timeCreated,  // ISO string
+      url
+    };
+  }));
+
+  items.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)); // 최신순
+  renderFileList(room, items);
+}
+```
+
+**다운로드/삭제 함수 (의사코드)**
+
+```js
+function downloadFile(item) {
+  window.open(item.url, '_blank'); // getDownloadURL 결과를 새 탭에서 열기
+}
+
+async function deleteFile(room, item) {
+  if (!confirm(`"${item.name}" 파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+  const fileRef = ref(storage, item.path);
+  await deleteObject(fileRef);
+  await refreshFileList(room);
+}
+```
+
+**용량 포맷터** (기존 앱들의 금액 포맷터와 동일한 패턴, KB/MB 단위 자동 전환):
+
+```js
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+```
+
+### 8.4 보안 현황과 한계
+
+현재 배포된 Storage 보안 규칙(Firebase 콘솔에서 이미 게시됨):
+
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}
+```
+
+즉 지금은 **누구나(로그인 없이) 읽기/쓰기(업로드/삭제 포함)가 가능한 완전 개방 상태**다. 사용자가 Firebase 콘솔 규칙 편집기에서 여러 번 입력 오류를 겪어, 우선 동작을 확인할 수 있는 가장 단순한 규칙으로 게시해 둔 상태다.
+
+- **이것은 진짜 보안이 아니다.** `materials.html`의 URL(및 그 안에서 호출하는 Storage 버킷)을 아는 사람은 누구나 업로드·다운로드·삭제가 가능하다.
+- 이는 7장에서 이미 채택한 트레이드오프와 같은 맥락이다 — 회사 홈페이지 비밀번호 잠금("7200")도 "완전한 보안"이 아니라 "일반 방문자가 실수로/무심코 보는 것을 막는 가림막" 수준으로 설계했었다. `materials.html`도 (a) `internal-area`(비밀번호 통과 후에만 보이는 내부 레이어) 안에서만 링크로 연결되므로 일반 외부 방문자는 애초에 도달하기 어렵지만, (b) URL을 직접 아는 사람이라면 비밀번호 우회 여부와 무관하게 Storage 자체는 열려 있다는 한계가 남는다.
+- 클라이언트 쪽에서 보완하는 것: 파일 크기 20MB 초과 시 업로드 자체를 막아(8.3절 `validateFileSize`), 실수로 매우 큰 파일을 올려 스토리지 용량/비용이 낭비되는 사고 정도는 예방한다. 이것도 "보안"이 아니라 "실수 방지" 목적임을 명확히 한다.
+- 이 현황과 한계는 화면에도(8.6절 안내 박스) 동일하게 고지한다 — 사용자가 이후 Firebase 콘솔에서 Authentication 등을 붙여 규칙을 강화하기 전까지는 계속 유효한 제약이다.
+
+### 8.5 UI/디자인
+
+**허브 카드 변경** (`index.html`, `internal-area` > `hub-grid` 세 번째 카드):
+- 기존: `<div class="hub-card hub-card-disabled" aria-disabled="true">` (클릭 불가 placeholder, 아이콘 🧩, 제목 "기타 업무 도구", 설명 "추후 추가 예정입니다.")
+- 변경 후: 다른 두 카드(현장정산서, 법인차량관리)와 동일하게 `<a class="hub-card" href="materials.html">`로 바꾸고, 아이콘은 📁(또는 🗂️), 제목 "업무자료", 설명 "공사자료·안전자료 파일을 업로드하고 공유합니다."로 교체. `hub-card-disabled` 클래스 제거.
+
+**`materials.html` 페이지 레이아웃** (위→아래):
+1. 헤더: 페이지 제목("업무자료실") + "← 포털로 돌아가기" 링크(`index.html`) + 다크모드 토글(기존 패턴 재사용).
+2. 사용법 안내 박스(`guide-box` 패턴 재사용, 8.6절 문구).
+3. 방 전환 탭 또는 섹션: "1. 공사자료" / "2. 안전자료" 두 개를 탭 버튼(`role="tab"`)으로 전환하거나, 스크롤로 이어지는 두 섹션으로 배치(Build 단계 재량이되 탭 방식을 우선 권장 — 방마다 독립된 파일 목록이 길어질 수 있어 한 화면에 두 방을 동시에 쌓아두면 스크롤이 길어짐).
+4. 각 방 내부:
+   - 업로드 영역: `<input type="file" accept=".pdf,.dwg,.dxf,.xls,.xlsx">` + "업로드" 버튼. 업로드 중에는 파일명 옆에 진행률(%) 텍스트 또는 진행 바 표시.
+   - 파일 목록: 기존 `item-card` 패턴을 재사용한 카드형 리스트. 각 카드에 파일명, 용량(`formatBytes`), 업로드 일시(`toLocaleString('ko-KR')`), "다운로드"/"삭제" 버튼 2개.
+   - 목록이 비어 있으면 "아직 업로드된 파일이 없습니다." 안내.
+
+**스타일 원칙** (`materials.css`): `style.css`와 동일한 CSS 변수 이름·값(`--color-bg`, `--color-bg-secondary`, `--color-text`, `--color-text-secondary`, `--color-accent`, `--color-border`, `--color-code-bg`, `--font-body`, `--font-mono`)을 `:root`에 재선언, 다크모드도 동일 패턴(`@media (prefers-color-scheme: dark)` + `:root[data-theme='dark']`)으로 대응. 탭 UI, 업로드 영역, 진행률 바, 파일 카드 스타일을 추가. 반응형: 좁은 화면에서 파일 카드 내부 버튼 2개가 줄바꿈되어도 터치 타깃 44px 이상 유지, 탭은 모바일에서도 가로로 나열 가능한 크기로.
+
+### 8.6 사용법 안내 및 보안 고지 문구 (화면 표시용)
+
+`materials.html`의 `guide-box`에 다음 항목을 포함한다:
+- "이 페이지에 업로드한 파일은 브라우저 로컬 저장이 아니라 **모든 방문자가 접근 가능한 공유 저장소(Firebase Storage)**에 저장되며, 같은 링크로 접속하는 모든 직원이 함께 봅니다."
+- "이 링크(URL)를 아는 사람은 누구나 업로드·다운로드·삭제가 가능한 수준의 보안입니다 — 회사 홈페이지의 비밀번호 잠금(7200)과 같은 성격의 트레이드오프로, 완전한 보안 장치가 아닙니다."
+- "파일 1개당 최대 20MB까지 업로드할 수 있습니다."
+
+### 8.7 작업 순서(체크리스트) — Build 단계용 (이어서 18번부터)
+
+18. `index.html`: `hub-grid`의 세 번째 카드(`hub-card-disabled`, "기타 업무 도구")를 `<a class="hub-card" href="materials.html">`(아이콘 📁, 제목 "업무자료", 설명 "공사자료·안전자료 파일을 업로드하고 공유합니다.")로 교체. `settlement`/`vehicle-fleet` 카드와 마크업 패턴 동일하게 맞춤.
+19. `materials.html` 뼈대 생성: 헤더(제목+뒤로가기 링크+다크모드 토글), `guide-box`(8.6절 문구), 공사자료/안전자료 두 방의 탭 또는 섹션 마크업(업로드 영역 + 파일 목록 컨테이너), `<script type="module" src="materials.js"></script>` 연결.
+20. `materials.css` 작성: CSS 변수 재선언 + 다크모드 대응(style.css와 동일 값), 헤더/가이드박스/탭/업로드/진행바/파일카드 스타일, 반응형. `materials.html`에 링크 연결 후 다크모드 없이도 정적 레이아웃이 팔레트에 맞게 보이는지 1차 확인.
+21. `materials.js` 작성(1차): Firebase 초기화(ES 모듈 CDN import, 8.3절 설정값 그대로), `storage` 인스턴스 생성까지 콘솔 에러 없이 로드되는지 확인.
+22. `materials.js` 작성(2차): `refreshFileList(room)`(listAll+getMetadata+getDownloadURL) 및 `renderFileList` 구현, 페이지 로드 시 두 방(`construction`, `safety`) 목록을 각각 불러와 렌더링. 최초에는 빈 버킷이므로 "업로드된 파일이 없습니다" 상태가 정상 표시되는지 확인.
+23. `materials.js` 작성(3차): `uploadFile` 구현(20MB 검증 → `uploadBytesResumable` → 진행률 UI → 완료 시 `refreshFileList` 재호출). 실제로 PDF/엑셀 파일 1개씩 업로드해 목록에 반영되는지, 20MB 초과 파일 시도 시 업로드가 차단되고 안내 메시지가 뜨는지 확인.
+24. `materials.js` 작성(4차): `downloadFile`(새 탭 열기), `deleteFile`(confirm 후 `deleteObject` + 목록 갱신) 구현 및 확인.
+25. 탭 전환(공사자료 ↔ 안전자료) 동작 확인 — 각 방의 파일 목록이 서로 섞이지 않고 독립적으로 표시/업로드/삭제되는지(`construction/`, `safety/` 경로 분리가 실제로 지켜지는지) 확인.
+26. 다크모드·모바일 반응형 확인(다른 화면들과 동일 패턴).
+27. 최종 점검: (a) `index.html`의 업무자료 카드 클릭 시 `materials.html`로 정상 이동하는지, (b) 8.4절 보안 고지 문구와 20MB 제한 안내가 실제 화면에 보이는지, (c) `apps/company-portal/` 외 파일(다른 앱, 블로그 본체)이 이번 작업으로 전혀 변경되지 않았는지 `git diff`로 확인 후 Build 서브에이전트 작업 종료.

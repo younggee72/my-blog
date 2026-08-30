@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>업무자료실 — 지천건설 사내 포털</title>
+<link rel="icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="materials.css">
+</head>
+<body>
+
+<header class="header">
+  <h1 class="title">📁 업무자료실</h1>
+  <div class="header-actions">
+    <a class="header-btn" href="index.html">← 포털로 돌아가기</a>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
+  </div>
+</header>
+
+<section id="guide-box" class="guide-box">
+  <button id="guide-toggle" class="guide-toggle" type="button" aria-expanded="true">
+    <span id="guide-toggle-label">사용법 안내 닫기</span>
+  </button>
+  <div id="guide-content" class="guide-content">
+    <ul>
+      <li>이 페이지에 업로드한 파일은 브라우저 로컬 저장이 아니라 <strong>모든 방문자가 접근 가능한 공유 저장소(Firebase Storage)</strong>에 저장되며, 같은 링크로 접속하는 모든 직원이 함께 봅니다.</li>
+      <li>이 링크(URL)를 아는 사람은 누구나 업로드·다운로드·삭제가 가능한 수준의 보안입니다 — 회사 홈페이지의 비밀번호 잠금(7200)과 같은 성격의 트레이드오프로, 완전한 보안 장치가 아닙니다.</li>
+      <li>파일 1개당 최대 20MB까지 업로드할 수 있습니다.</li>
+    </ul>
+  </div>
+</section>
+
+<main class="container">
+
+  <div class="tabs" role="tablist" aria-label="업무자료 방 선택">
+    <button id="tab-construction" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="room-construction" data-room="construction">1. 공사자료</button>
+    <button id="tab-safety" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="room-safety" data-room="safety">2. 안전자료</button>
+  </div>
+
+  <!-- ================= 공사자료 ================= -->
+  <section id="room-construction" class="room-panel" role="tabpanel" aria-labelledby="tab-construction">
+    <div class="upload-area">
+      <input id="upload-input-construction" class="upload-input" type="file" accept=".pdf,.dwg,.dxf,.xls,.xlsx">
+      <button id="upload-btn-construction" class="btn btn-primary" type="button" data-room="construction">업로드</button>
+    </div>
+    <div id="upload-progress-construction" class="upload-progress-list"></div>
+    <p id="error-msg-construction" class="error-msg" hidden></p>
+
+    <div id="file-list-construction" class="file-card-list"></div>
+    <p id="empty-msg-construction" class="empty-msg" hidden>아직 업로드된 파일이 없습니다.</p>
+  </section>
+
+  <!-- ================= 안전자료 ================= -->
+  <section id="room-safety" class="room-panel" role="tabpanel" aria-labelledby="tab-safety" hidden>
+    <div class="upload-area">
+      <input id="upload-input-safety" class="upload-input" type="file" accept=".pdf,.dwg,.dxf,.xls,.xlsx">
+      <button id="upload-btn-safety" class="btn btn-primary" type="button" data-room="safety">업로드</button>
+    </div>
+    <div id="upload-progress-safety" class="upload-progress-list"></div>
+    <p id="error-msg-safety" class="error-msg" hidden></p>
+
+    <div id="file-list-safety" class="file-card-list"></div>
+    <p id="empty-msg-safety" class="empty-msg" hidden>아직 업로드된 파일이 없습니다.</p>
+  </section>
+
+</main>
+
+<script type="module" src="materials.js"></script>
+</body>
+</html>
