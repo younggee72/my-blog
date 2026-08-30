@@ -1,4 +1,5 @@
-// materials.js — 업무자료실: Firebase Storage 초기화 + 폴더(윈도우 탐색기 스타일 무한 하위 폴더)
+// materials.js — 업무자료실: Firebase Storage 초기화 + 윈도우 탐색기 스타일의 단일 폴더 트리
+// (공사자료/안전자료도 최상위 폴더일 뿐이며, 같은 레벨에 새 폴더를 계속 추가할 수 있다)
 // + 업로드/목록/다운로드/삭제 로직 + 렌더링 (spec.md 8장 참고).
 // ES 모듈로 로드된다 (index.html/portal.js/app.js와는 완전히 분리된 페이지).
 
@@ -21,27 +22,29 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
-const ROOMS = ['construction', 'safety'];
-const ROOM_LABELS = { construction: '🏠 공사자료', safety: '🏠 안전자료' };
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
 const KEEP_FILE = '.keep'; // 빈 폴더를 표현하기 위한 0바이트 placeholder 파일명
+const ROOT_LABEL = '🏠 업무자료실';
+// 기존에 탭으로 쓰던 최상위 폴더 2개는 한글 라벨로 표시(그 외 폴더는 사용자가 입력한 이름 그대로 표시)
+const ROOT_FOLDER_LABELS = { construction: '공사자료', safety: '안전자료' };
 
-// 방(room)별 현재 탐색 중인 경로. 예: ['전기공사', '2026년'] → construction/전기공사/2026년
-const state = {
-  construction: { path: [] },
-  safety: { path: [] },
-};
+// 현재 탐색 중인 경로. 예: ['construction', '전기공사', '2026년']
+let currentPath = [];
 
 // ---------- 경로/이름 헬퍼 ----------
 
-function currentStoragePath(room) {
-  const path = state[room].path;
-  return path.length ? `${room}/${path.join('/')}` : room;
+function currentRef() {
+  return currentPath.length ? ref(storage, currentPath.join('/')) : ref(storage);
 }
 
-function buildStoragePath(room, file) {
-  const prefixed = `${Date.now()}_${file.name}`;
-  return `${currentStoragePath(room)}/${prefixed}`;
+function folderLabel(name, depth) {
+  if (depth === 0 && ROOT_FOLDER_LABELS[name]) return `📁 ${ROOT_FOLDER_LABELS[name]}`;
+  return `📁 ${name}`;
+}
+
+function breadcrumbSegmentLabel(name, depth) {
+  if (depth === 0 && ROOT_FOLDER_LABELS[name]) return ROOT_FOLDER_LABELS[name];
+  return name;
 }
 
 function displayName(storagePath) {
@@ -64,27 +67,20 @@ function formatDate(isoString) {
 
 // ---------- DOM 참조 ----------
 
-function roomEls(room) {
-  return {
-    input: document.getElementById(`upload-input-${room}`),
-    uploadBtn: document.getElementById(`upload-btn-${room}`),
-    progressList: document.getElementById(`upload-progress-${room}`),
-    errorMsg: document.getElementById(`error-msg-${room}`),
-    fileList: document.getElementById(`file-list-${room}`),
-    emptyMsg: document.getElementById(`empty-msg-${room}`),
-  };
-}
-
-function folderEls(room) {
-  return {
-    breadcrumb: document.getElementById(`breadcrumb-${room}`),
-    folderList: document.getElementById(`folder-list-${room}`),
-    folderErrorMsg: document.getElementById(`folder-error-msg-${room}`),
-    newFolderInput: document.getElementById(`new-folder-input-${room}`),
-    newFolderBtn: document.getElementById(`new-folder-btn-${room}`),
-    deleteFolderBtn: document.getElementById(`delete-folder-btn-${room}`),
-  };
-}
+const els = {
+  breadcrumb: document.getElementById('breadcrumb'),
+  newFolderInput: document.getElementById('new-folder-input'),
+  newFolderBtn: document.getElementById('new-folder-btn'),
+  deleteFolderBtn: document.getElementById('delete-folder-btn'),
+  folderErrorMsg: document.getElementById('folder-error-msg'),
+  folderList: document.getElementById('folder-list'),
+  input: document.getElementById('upload-input'),
+  uploadBtn: document.getElementById('upload-btn'),
+  progressList: document.getElementById('upload-progress'),
+  errorMsg: document.getElementById('error-msg'),
+  fileList: document.getElementById('file-list'),
+  emptyMsg: document.getElementById('empty-msg'),
+};
 
 // XSS 방지: 파일명/폴더명 등 사용자 입력값은 textContent로만 DOM에 넣는다.
 function el(tag, opts) {
@@ -99,39 +95,34 @@ function el(tag, opts) {
   return node;
 }
 
-function showError(room, message) {
-  const { errorMsg } = roomEls(room);
-  errorMsg.textContent = message;
-  errorMsg.hidden = false;
+function showError(message) {
+  els.errorMsg.textContent = message;
+  els.errorMsg.hidden = false;
 }
 
-function clearError(room) {
-  const { errorMsg } = roomEls(room);
-  errorMsg.hidden = true;
-  errorMsg.textContent = '';
+function clearError() {
+  els.errorMsg.hidden = true;
+  els.errorMsg.textContent = '';
 }
 
-function showFolderError(room, message) {
-  const { folderErrorMsg } = folderEls(room);
-  folderErrorMsg.textContent = message;
-  folderErrorMsg.hidden = false;
+function showFolderError(message) {
+  els.folderErrorMsg.textContent = message;
+  els.folderErrorMsg.hidden = false;
 }
 
-function clearFolderError(room) {
-  const { folderErrorMsg } = folderEls(room);
-  folderErrorMsg.hidden = true;
-  folderErrorMsg.textContent = '';
+function clearFolderError() {
+  els.folderErrorMsg.hidden = true;
+  els.folderErrorMsg.textContent = '';
 }
 
 // ---------- 업로드 진행률 UI ----------
 
-function progressItemId(room, key) {
-  return `upload-progress-${room}-${key}`;
+function progressItemId(key) {
+  return `upload-progress-${key}`;
 }
 
-function showProgressUI(room, key, fileName, pct) {
-  const { progressList } = roomEls(room);
-  const id = progressItemId(room, key);
+function showProgressUI(key, fileName, pct) {
+  const id = progressItemId(key);
   let item = document.getElementById(id);
   if (!item) {
     item = el('div', { className: 'upload-progress-item', attrs: { id } });
@@ -146,30 +137,29 @@ function showProgressUI(room, key, fileName, pct) {
     track.appendChild(fill);
     item.appendChild(nameRow);
     item.appendChild(track);
-    progressList.appendChild(item);
+    els.progressList.appendChild(item);
   }
   return item;
 }
 
-function updateProgressUI(room, key, fileName, pct) {
-  const item = showProgressUI(room, key, fileName, pct);
+function updateProgressUI(key, fileName, pct) {
+  const item = showProgressUI(key, fileName, pct);
   const pctSpan = item.querySelector('.upload-progress-pct');
   const fill = item.querySelector('.upload-progress-fill');
   if (pctSpan) pctSpan.textContent = `${pct}%`;
   if (fill) fill.style.width = `${pct}%`;
 }
 
-function hideProgressUI(room, key) {
-  const id = progressItemId(room, key);
-  const item = document.getElementById(id);
+function hideProgressUI(key) {
+  const item = document.getElementById(progressItemId(key));
   if (item) item.remove();
 }
 
 // ---------- 파일 크기 검증 ----------
 
-function validateFileSize(room, file) {
+function validateFileSize(file) {
   if (file.size > MAX_FILE_SIZE) {
-    showError(room, `"${file.name}" 파일이 200MB를 초과합니다. (${formatBytes(file.size)}) 200MB 이하 파일만 업로드할 수 있습니다.`);
+    showError(`"${file.name}" 파일이 200MB를 초과합니다. (${formatBytes(file.size)}) 200MB 이하 파일만 업로드할 수 있습니다.`);
     return false;
   }
   return true;
@@ -177,141 +167,133 @@ function validateFileSize(room, file) {
 
 // ---------- 탐색(경로 이동) ----------
 
-function renderBreadcrumb(room) {
-  const { breadcrumb } = folderEls(room);
-  breadcrumb.innerHTML = '';
-  const path = state[room].path;
+function renderBreadcrumb() {
+  els.breadcrumb.innerHTML = '';
 
   const homeBtn = el('button', {
-    className: path.length ? 'breadcrumb-link' : 'breadcrumb-current',
-    text: ROOM_LABELS[room],
+    className: currentPath.length ? 'breadcrumb-link' : 'breadcrumb-current',
+    text: ROOT_LABEL,
     attrs: { type: 'button' }
   });
-  if (path.length) homeBtn.addEventListener('click', () => goToDepth(room, 0));
-  breadcrumb.appendChild(homeBtn);
+  if (currentPath.length) homeBtn.addEventListener('click', () => goToDepth(0));
+  els.breadcrumb.appendChild(homeBtn);
 
-  path.forEach((segment, idx) => {
-    breadcrumb.appendChild(el('span', { className: 'breadcrumb-sep', text: '›' }));
-    const isLast = idx === path.length - 1;
+  currentPath.forEach((segment, idx) => {
+    els.breadcrumb.appendChild(el('span', { className: 'breadcrumb-sep', text: '›' }));
+    const isLast = idx === currentPath.length - 1;
     const segBtn = el('button', {
       className: isLast ? 'breadcrumb-current' : 'breadcrumb-link',
-      text: segment,
+      text: breadcrumbSegmentLabel(segment, idx),
       attrs: { type: 'button' }
     });
-    if (!isLast) segBtn.addEventListener('click', () => goToDepth(room, idx + 1));
-    breadcrumb.appendChild(segBtn);
+    if (!isLast) segBtn.addEventListener('click', () => goToDepth(idx + 1));
+    els.breadcrumb.appendChild(segBtn);
   });
 }
 
-function goToDepth(room, depth) {
-  state[room].path = state[room].path.slice(0, depth);
-  refreshExplorer(room);
+function goToDepth(depth) {
+  currentPath = currentPath.slice(0, depth);
+  refreshExplorer();
 }
 
-function enterFolder(room, name) {
-  state[room].path.push(name);
-  refreshExplorer(room);
+function enterFolder(name) {
+  currentPath.push(name);
+  refreshExplorer();
 }
 
 // ---------- 폴더 만들기/삭제 ----------
 
-async function createFolder(room, rawName) {
+async function createFolder(rawName) {
   const name = rawName.trim();
-  clearFolderError(room);
+  clearFolderError();
   if (!name) {
-    showFolderError(room, '폴더 이름을 입력해주세요.');
+    showFolderError('폴더 이름을 입력해주세요.');
     return;
   }
   if (name.includes('/')) {
-    showFolderError(room, '폴더 이름에 "/"는 사용할 수 없습니다.');
+    showFolderError('폴더 이름에 "/"는 사용할 수 없습니다.');
     return;
   }
   try {
-    const keepRef = ref(storage, `${currentStoragePath(room)}/${name}/${KEEP_FILE}`);
+    const keepRef = ref(currentRef(), `${name}/${KEEP_FILE}`);
     await uploadBytes(keepRef, new Uint8Array());
-    folderEls(room).newFolderInput.value = '';
-    refreshExplorer(room);
+    els.newFolderInput.value = '';
+    refreshExplorer();
   } catch (err) {
-    console.warn(`[materials] ${room} 폴더 생성 실패`, err);
-    showFolderError(room, `폴더 생성 실패: ${err.message}`);
+    console.warn('[materials] 폴더 생성 실패', err);
+    showFolderError(`폴더 생성 실패: ${err.message}`);
   }
 }
 
 // 폴더 하나를 그 안의 모든 하위 폴더/파일까지 재귀적으로 삭제한다.
-async function deleteObjectsRecursive(path) {
-  const folderRef = ref(storage, path);
+async function deleteObjectsRecursive(folderRef) {
   const result = await listAll(folderRef);
   await Promise.all(result.items.map((itemRef) => deleteObject(itemRef)));
-  await Promise.all(result.prefixes.map((prefixRef) => deleteObjectsRecursive(prefixRef.fullPath)));
+  await Promise.all(result.prefixes.map((prefixRef) => deleteObjectsRecursive(prefixRef)));
 }
 
-async function deleteFolder(room) {
-  const path = state[room].path;
-  if (path.length === 0) return;
-  const name = path[path.length - 1];
+async function deleteFolder() {
+  if (currentPath.length === 0) return;
+  const name = currentPath[currentPath.length - 1];
   const ok = confirm(`"${name}" 폴더와 그 안의 모든 하위 폴더·파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`);
   if (!ok) return;
   try {
-    await deleteObjectsRecursive(currentStoragePath(room));
-    goToDepth(room, path.length - 1);
+    await deleteObjectsRecursive(currentRef());
+    goToDepth(currentPath.length - 1);
   } catch (err) {
-    console.warn(`[materials] ${room} 폴더 삭제 실패`, err);
-    showError(room, `폴더 삭제 실패: ${err.message}`);
+    console.warn('[materials] 폴더 삭제 실패', err);
+    showError(`폴더 삭제 실패: ${err.message}`);
   }
 }
 
 // ---------- 업로드 ----------
 
-function uploadFile(room, file) {
-  clearError(room);
-  if (!validateFileSize(room, file)) return;
+function uploadFile(file) {
+  clearError();
+  if (!validateFileSize(file)) return;
 
-  const path = buildStoragePath(room, file);
-  const fileRef = ref(storage, path);
+  const prefixed = `${Date.now()}_${file.name}`;
+  const fileRef = ref(currentRef(), prefixed);
   const task = uploadBytesResumable(fileRef, file);
   const key = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-  showProgressUI(room, key, file.name, 0);
+  showProgressUI(key, file.name, 0);
 
   task.on('state_changed',
     (snapshot) => {
       const pct = snapshot.totalBytes > 0
         ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
         : 0;
-      updateProgressUI(room, key, file.name, pct);
+      updateProgressUI(key, file.name, pct);
     },
     (error) => {
-      hideProgressUI(room, key);
-      showError(room, `업로드 실패: ${error.message}`);
+      hideProgressUI(key);
+      showError(`업로드 실패: ${error.message}`);
     },
     () => {
-      hideProgressUI(room, key);
-      refreshExplorer(room);
+      hideProgressUI(key);
+      refreshExplorer();
     }
   );
 }
 
 // ---------- 현재 경로 조회/렌더링(하위 폴더 + 파일) ----------
 
-async function refreshExplorer(room) {
-  clearError(room);
-  clearFolderError(room);
-  renderBreadcrumb(room);
-  folderEls(room).deleteFolderBtn.hidden = state[room].path.length === 0;
-
-  const { folderList } = folderEls(room);
-  const { fileList, emptyMsg } = roomEls(room);
+async function refreshExplorer() {
+  clearError();
+  clearFolderError();
+  renderBreadcrumb();
+  els.deleteFolderBtn.hidden = currentPath.length === 0;
 
   try {
-    const folderRef = ref(storage, currentStoragePath(room));
-    const result = await listAll(folderRef);
+    const result = await listAll(currentRef());
 
     // 하위 폴더 렌더링
-    folderList.innerHTML = '';
+    els.folderList.innerHTML = '';
     result.prefixes.forEach((prefixRef) => {
-      const card = el('button', { className: 'folder-card', text: `📁 ${prefixRef.name}`, attrs: { type: 'button' } });
-      card.addEventListener('click', () => enterFolder(room, prefixRef.name));
-      folderList.appendChild(card);
+      const card = el('button', { className: 'folder-card', text: folderLabel(prefixRef.name, currentPath.length), attrs: { type: 'button' } });
+      card.addEventListener('click', () => enterFolder(prefixRef.name));
+      els.folderList.appendChild(card);
     });
 
     // 현재 경로에 있는 파일 렌더링
@@ -338,22 +320,20 @@ async function refreshExplorer(room) {
 
     const validItems = items.filter((it) => it !== null);
     validItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
-    renderFileList(room, validItems);
+    renderFileList(validItems);
 
-    emptyMsg.hidden = !(result.prefixes.length === 0 && validItems.length === 0);
+    els.emptyMsg.hidden = !(result.prefixes.length === 0 && validItems.length === 0);
   } catch (err) {
-    console.warn(`[materials] ${room} 목록 조회 실패`, err);
-    showError(room, `목록을 불러오지 못했습니다: ${err.message}`);
-    folderList.innerHTML = '';
-    fileList.innerHTML = '';
-    emptyMsg.hidden = false;
+    console.warn('[materials] 목록 조회 실패', err);
+    showError(`목록을 불러오지 못했습니다: ${err.message}`);
+    els.folderList.innerHTML = '';
+    els.fileList.innerHTML = '';
+    els.emptyMsg.hidden = false;
   }
 }
 
-function renderFileList(room, items) {
-  const { fileList } = roomEls(room);
-  fileList.innerHTML = '';
-
+function renderFileList(items) {
+  els.fileList.innerHTML = '';
   if (items.length === 0) return;
 
   const wrap = el('div', { className: 'file-table-wrap' });
@@ -383,7 +363,7 @@ function renderFileList(room, items) {
 
     const deleteCell = el('td', { className: 'file-table-action' });
     const deleteBtn = el('button', { className: 'btn btn-danger', text: '삭제', attrs: { type: 'button' } });
-    deleteBtn.addEventListener('click', () => deleteFile(room, item));
+    deleteBtn.addEventListener('click', () => deleteFile(item));
     deleteCell.appendChild(deleteBtn);
     row.appendChild(deleteCell);
 
@@ -392,7 +372,7 @@ function renderFileList(room, items) {
   table.appendChild(tbody);
 
   wrap.appendChild(table);
-  fileList.appendChild(wrap);
+  els.fileList.appendChild(wrap);
 }
 
 // ---------- 다운로드/삭제 ----------
@@ -401,65 +381,37 @@ function downloadFile(item) {
   window.open(item.url, '_blank');
 }
 
-async function deleteFile(room, item) {
+async function deleteFile(item) {
   const ok = confirm(`"${item.name}" 파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`);
   if (!ok) return;
   try {
-    const fileRef = ref(storage, item.path);
-    await deleteObject(fileRef);
-    await refreshExplorer(room);
+    await deleteObject(ref(storage, item.path));
+    await refreshExplorer();
   } catch (err) {
     console.warn(`[materials] 삭제 실패(${item.path})`, err);
-    showError(room, `삭제 실패: ${err.message}`);
+    showError(`삭제 실패: ${err.message}`);
   }
 }
 
-// ---------- 업로드 버튼/입력 바인딩 ----------
+// ---------- 버튼/입력 바인딩 ----------
 
-function bindUpload(room) {
-  const { input, uploadBtn } = roomEls(room);
-  uploadBtn.addEventListener('click', () => {
-    const file = input.files && input.files[0];
+function bindControls() {
+  els.uploadBtn.addEventListener('click', () => {
+    const file = els.input.files && els.input.files[0];
     if (!file) {
-      showError(room, '업로드할 파일을 선택해주세요.');
+      showError('업로드할 파일을 선택해주세요.');
       return;
     }
-    uploadFile(room, file);
-    input.value = '';
-  });
-}
-
-// ---------- 폴더 버튼/입력 바인딩 ----------
-
-function bindFolderControls(room) {
-  const { newFolderInput, newFolderBtn, deleteFolderBtn } = folderEls(room);
-
-  newFolderBtn.addEventListener('click', () => createFolder(room, newFolderInput.value));
-  newFolderInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') createFolder(room, newFolderInput.value);
+    uploadFile(file);
+    els.input.value = '';
   });
 
-  deleteFolderBtn.addEventListener('click', () => deleteFolder(room));
-}
-
-// ---------- 탭 전환 ----------
-
-function bindTabs() {
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  tabBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const targetRoom = btn.dataset.room;
-      tabBtns.forEach((b) => {
-        const active = b === btn;
-        b.classList.toggle('active', active);
-        b.setAttribute('aria-selected', String(active));
-      });
-      ROOMS.forEach((room) => {
-        const panel = document.getElementById(`room-${room}`);
-        if (panel) panel.hidden = room !== targetRoom;
-      });
-    });
+  els.newFolderBtn.addEventListener('click', () => createFolder(els.newFolderInput.value));
+  els.newFolderInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') createFolder(els.newFolderInput.value);
   });
+
+  els.deleteFolderBtn.addEventListener('click', () => deleteFolder());
 }
 
 // ---------- 다크모드(다른 앱과 동일 패턴) ----------
@@ -524,12 +476,8 @@ function initGuideBox() {
 function init() {
   initTheme();
   initGuideBox();
-  bindTabs();
-  ROOMS.forEach((room) => {
-    bindUpload(room);
-    bindFolderControls(room);
-    refreshExplorer(room);
-  });
+  bindControls();
+  refreshExplorer();
 }
 
 init();

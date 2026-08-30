@@ -27,67 +27,33 @@
       <li>이 페이지에 업로드한 파일은 브라우저 로컬 저장이 아니라 <strong>모든 방문자가 접근 가능한 공유 저장소(Firebase Storage)</strong>에 저장되며, 같은 링크로 접속하는 모든 직원이 함께 봅니다.</li>
       <li>이 링크(URL)를 아는 사람은 누구나 업로드·다운로드·삭제가 가능한 수준의 보안입니다 — 회사 홈페이지의 비밀번호 잠금(7200)과 같은 성격의 트레이드오프로, 완전한 보안 장치가 아닙니다.</li>
       <li>파일 1개당 최대 200MB까지 업로드할 수 있습니다.</li>
-      <li>📁 윈도우 탐색기처럼 폴더 안에 폴더를 계속 만들어 자료를 주제별·내용별로 정리할 수 있습니다. 어느 폴더에 들어가 있든 그 위치에 새 폴더를 만들 수 있고, 위쪽 경로(예: 공사자료 › 전기공사)를 클릭하면 상위 폴더로 바로 이동합니다.</li>
+      <li>📁 윈도우 탐색기처럼 폴더 안에 폴더를 계속 만들어 자료를 정리할 수 있습니다. "공사자료"·"안전자료"도 그냥 폴더라서, 같은 위치에 새 폴더(예: 품질자료)를 추가로 만들 수 있습니다. 위쪽 경로를 클릭하면 상위 폴더로 바로 이동합니다.</li>
     </ul>
   </div>
 </section>
 
 <main class="container">
 
-  <div class="tabs" role="tablist" aria-label="업무자료 방 선택">
-    <button id="tab-construction" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="room-construction" data-room="construction">1. 공사자료</button>
-    <button id="tab-safety" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="room-safety" data-room="safety">2. 안전자료</button>
+  <div id="breadcrumb" class="breadcrumb"></div>
+
+  <div class="new-folder-area">
+    <input id="new-folder-input" class="upload-input" type="text" placeholder="새 폴더 이름 (예: 품질자료)">
+    <button id="new-folder-btn" class="btn btn-secondary" type="button">📁 폴더 만들기</button>
+    <button id="delete-folder-btn" class="btn btn-danger" type="button" hidden>이 폴더 삭제</button>
   </div>
+  <p id="folder-error-msg" class="error-msg" hidden></p>
 
-  <!-- ================= 공사자료 ================= -->
-  <section id="room-construction" class="room-panel" role="tabpanel" aria-labelledby="tab-construction">
+  <div id="folder-list" class="folder-grid"></div>
 
-    <div id="breadcrumb-construction" class="breadcrumb"></div>
+  <div class="upload-area">
+    <input id="upload-input" class="upload-input" type="file">
+    <button id="upload-btn" class="btn btn-primary" type="button">업로드</button>
+  </div>
+  <div id="upload-progress" class="upload-progress-list"></div>
+  <p id="error-msg" class="error-msg" hidden></p>
 
-    <div class="new-folder-area">
-      <input id="new-folder-input-construction" class="upload-input" type="text" placeholder="새 폴더 이름 (예: 전기공사)">
-      <button id="new-folder-btn-construction" class="btn btn-secondary" type="button" data-room="construction">📁 폴더 만들기</button>
-      <button id="delete-folder-btn-construction" class="btn btn-danger" type="button" hidden>이 폴더 삭제</button>
-    </div>
-    <p id="folder-error-msg-construction" class="error-msg" hidden></p>
-
-    <div id="folder-list-construction" class="folder-grid"></div>
-
-    <div class="upload-area">
-      <input id="upload-input-construction" class="upload-input" type="file">
-      <button id="upload-btn-construction" class="btn btn-primary" type="button" data-room="construction">업로드</button>
-    </div>
-    <div id="upload-progress-construction" class="upload-progress-list"></div>
-    <p id="error-msg-construction" class="error-msg" hidden></p>
-
-    <div id="file-list-construction" class="file-list"></div>
-    <p id="empty-msg-construction" class="empty-msg" hidden>아직 폴더나 파일이 없습니다.</p>
-  </section>
-
-  <!-- ================= 안전자료 ================= -->
-  <section id="room-safety" class="room-panel" role="tabpanel" aria-labelledby="tab-safety" hidden>
-
-    <div id="breadcrumb-safety" class="breadcrumb"></div>
-
-    <div class="new-folder-area">
-      <input id="new-folder-input-safety" class="upload-input" type="text" placeholder="새 폴더 이름 (예: 안전교육)">
-      <button id="new-folder-btn-safety" class="btn btn-secondary" type="button" data-room="safety">📁 폴더 만들기</button>
-      <button id="delete-folder-btn-safety" class="btn btn-danger" type="button" hidden>이 폴더 삭제</button>
-    </div>
-    <p id="folder-error-msg-safety" class="error-msg" hidden></p>
-
-    <div id="folder-list-safety" class="folder-grid"></div>
-
-    <div class="upload-area">
-      <input id="upload-input-safety" class="upload-input" type="file">
-      <button id="upload-btn-safety" class="btn btn-primary" type="button" data-room="safety">업로드</button>
-    </div>
-    <div id="upload-progress-safety" class="upload-progress-list"></div>
-    <p id="error-msg-safety" class="error-msg" hidden></p>
-
-    <div id="file-list-safety" class="file-list"></div>
-    <p id="empty-msg-safety" class="empty-msg" hidden>아직 폴더나 파일이 없습니다.</p>
-  </section>
+  <div id="file-list" class="file-list"></div>
+  <p id="empty-msg" class="empty-msg" hidden>아직 폴더나 파일이 없습니다.</p>
 
 </main>
 
