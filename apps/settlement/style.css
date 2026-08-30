@@ -59,6 +59,11 @@
   box-sizing: border-box;
 }
 
+/* 브라우저 기본 [hidden] 동작(display:none)이 author 스타일에 밀려 무시되는 것을 방지 */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--color-bg);
@@ -472,6 +477,69 @@ tfoot td {
   border: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
   color: var(--color-text);
+}
+
+/* ---------- 비밀번호 잠금(auth.js) ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.modal-panel {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  max-width: 420px;
+  width: 92vw;
+  padding: 1.5rem;
+}
+
+.modal-panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.form-hint {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 1rem;
+}
+
+.error-msg {
+  color: var(--settlement-danger);
+  font-size: 0.82rem;
+  margin: 0.4rem 0 0;
+}
+
+.unlock-hint {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+  margin: 0.85rem 0 0;
+}
+
+.auth-gate-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.auth-gate-actions button,
+.auth-gate-actions a {
+  border-radius: 6px;
+  padding: 0.7rem 1.2rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 @media (max-width: 640px) {

@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>현장정산서 자동화 도구</title>
-<link rel="stylesheet" href="style.css">
+<title>현장정산서</title>
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
-<header class="app-header">
-  <h1 class="app-title">현장정산서 자동화 도구</h1>
+<header class="app-header" hidden>
+  <h1 class="app-title">현장정산서</h1>
   <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
 </header>
 
-<nav class="app-tabs" aria-label="화면 전환">
+<nav class="app-tabs" aria-label="화면 전환" hidden>
   <a href="index.html" class="app-tab is-active" aria-current="page">정산서 작성</a>
   <a href="invoices.html" class="app-tab">계산서함</a>
 </nav>
 
-<main class="container">
+<main class="container" hidden>
   <section class="guide-box" aria-label="사용법 안내">
     <p>
       <strong>사용법</strong> — ① 공사명과 공급가액을 입력하면 부가세·합계가 자동으로 계산됩니다.
@@ -226,6 +226,7 @@
   </section>
 </main>
 
+<script src="auth.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="shared-utils.js?v=8"></script>
 <script src="settlement.js?v=7"></script>

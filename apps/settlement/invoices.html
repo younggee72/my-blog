@@ -3,22 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>계산서함 — 현장정산서 자동화 도구</title>
-<link rel="stylesheet" href="style.css?v=2">
+<title>계산서함 — 현장정산서</title>
+<link rel="stylesheet" href="style.css?v=3">
 <link rel="stylesheet" href="invoices.css?v=2">
 </head>
 <body>
-<header class="app-header">
+<header class="app-header" hidden>
   <h1 class="app-title">계산서함</h1>
   <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
 </header>
 
-<nav class="app-tabs" aria-label="화면 전환">
+<nav class="app-tabs" aria-label="화면 전환" hidden>
   <a href="index.html" class="app-tab">정산서 작성</a>
   <a href="invoices.html" class="app-tab is-active" aria-current="page">계산서함</a>
 </nav>
 
-<main class="container">
+<main class="container" hidden>
   <section class="guide-box" aria-label="사용법 안내">
     <p>
       <strong>사용법</strong> —
@@ -123,6 +123,7 @@
   </section>
 </main>
 
+<script src="auth.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
