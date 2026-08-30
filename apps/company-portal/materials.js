@@ -1,6 +1,5 @@
-// materials.js — 업무자료실: Firebase Storage 초기화 + 윈도우 탐색기 스타일의 단일 폴더 트리
-// (공사자료/안전자료도 최상위 폴더일 뿐이며, 같은 레벨에 새 폴더를 계속 추가할 수 있다)
-// + 업로드/목록/다운로드/삭제 로직 + 렌더링 (spec.md 8장 참고).
+// materials.js — 업무자료실: Firebase Storage 초기화 + 동적 탭(자료실) + 탭 안 윈도우 탐색기 스타일
+// 무한 하위 폴더 + 업로드/목록/다운로드/삭제 로직 + 렌더링 (spec.md 8장 참고).
 // ES 모듈로 로드된다 (index.html/portal.js/app.js와는 완전히 분리된 페이지).
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -23,28 +22,23 @@ const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
-const KEEP_FILE = '.keep'; // 빈 폴더를 표현하기 위한 0바이트 placeholder 파일명
-const ROOT_LABEL = '🏠 업무자료실';
-// 기존에 탭으로 쓰던 최상위 폴더 2개는 한글 라벨로 표시(그 외 폴더는 사용자가 입력한 이름 그대로 표시)
-const ROOT_FOLDER_LABELS = { construction: '공사자료', safety: '안전자료' };
+const KEEP_FILE = '.keep'; // 빈 폴더/자료실을 표현하기 위한 0바이트 placeholder 파일명
+// 기존부터 있던 최상위 자료실 2개는 한글 라벨로 표시(그 외 새로 만든 자료실은 입력한 이름 그대로 표시)
+const ROOM_LABELS = { construction: '공사자료', safety: '안전자료' };
 
-// 현재 탐색 중인 경로. 예: ['construction', '전기공사', '2026년']
-let currentPath = [];
+let rooms = [];        // 최상위 자료실(탭) 이름 목록
+let activeRoom = null;  // 현재 선택된 자료실
+let subPath = [];       // activeRoom 안에서 탐색 중인 하위 경로
 
 // ---------- 경로/이름 헬퍼 ----------
 
+function roomLabel(name) {
+  return ROOM_LABELS[name] || name;
+}
+
 function currentRef() {
-  return currentPath.length ? ref(storage, currentPath.join('/')) : ref(storage);
-}
-
-function folderLabel(name, depth) {
-  if (depth === 0 && ROOT_FOLDER_LABELS[name]) return `📁 ${ROOT_FOLDER_LABELS[name]}`;
-  return `📁 ${name}`;
-}
-
-function breadcrumbSegmentLabel(name, depth) {
-  if (depth === 0 && ROOT_FOLDER_LABELS[name]) return ROOT_FOLDER_LABELS[name];
-  return name;
+  const path = activeRoom ? [activeRoom, ...subPath] : [];
+  return path.length ? ref(storage, path.join('/')) : ref(storage);
 }
 
 function displayName(storagePath) {
@@ -68,6 +62,7 @@ function formatDate(isoString) {
 // ---------- DOM 참조 ----------
 
 const els = {
+  tabs: document.getElementById('tabs'),
   breadcrumb: document.getElementById('breadcrumb'),
   newFolderInput: document.getElementById('new-folder-input'),
   newFolderBtn: document.getElementById('new-folder-btn'),
@@ -165,25 +160,82 @@ function validateFileSize(file) {
   return true;
 }
 
+// ---------- 자료실(탭) ----------
+
+async function loadRooms() {
+  const result = await listAll(ref(storage));
+  rooms = result.prefixes.map((p) => p.name);
+  if (!activeRoom || !rooms.includes(activeRoom)) {
+    activeRoom = rooms[0] || null;
+    subPath = [];
+  }
+  renderTabs();
+}
+
+function renderTabs() {
+  els.tabs.innerHTML = '';
+  rooms.forEach((room, idx) => {
+    const btn = el('button', {
+      className: 'tab-btn' + (room === activeRoom ? ' active' : ''),
+      text: `${idx + 1}. ${roomLabel(room)}`,
+      attrs: { type: 'button', role: 'tab', 'aria-selected': String(room === activeRoom) }
+    });
+    btn.addEventListener('click', () => selectRoom(room));
+    els.tabs.appendChild(btn);
+  });
+
+  const addBtn = el('button', { className: 'tab-btn tab-add-btn', text: '+ 새 자료실', attrs: { type: 'button' } });
+  addBtn.addEventListener('click', addRoom);
+  els.tabs.appendChild(addBtn);
+}
+
+function selectRoom(room) {
+  activeRoom = room;
+  subPath = [];
+  renderTabs();
+  refreshExplorer();
+}
+
+async function addRoom() {
+  const rawName = window.prompt('새 자료실(탭) 이름을 입력하세요 (예: 품질자료)');
+  if (rawName === null) return;
+  const name = rawName.trim();
+  if (!name) return;
+  if (name.includes('/')) {
+    window.alert('이름에 "/"는 사용할 수 없습니다.');
+    return;
+  }
+  try {
+    const keepRef = ref(storage, `${name}/${KEEP_FILE}`);
+    await uploadBytes(keepRef, new Uint8Array());
+    await loadRooms();
+    selectRoom(name);
+  } catch (err) {
+    console.warn('[materials] 자료실 생성 실패', err);
+    window.alert(`자료실 생성 실패: ${err.message}`);
+  }
+}
+
 // ---------- 탐색(경로 이동) ----------
 
 function renderBreadcrumb() {
   els.breadcrumb.innerHTML = '';
+  if (!activeRoom) return;
 
   const homeBtn = el('button', {
-    className: currentPath.length ? 'breadcrumb-link' : 'breadcrumb-current',
-    text: ROOT_LABEL,
+    className: subPath.length ? 'breadcrumb-link' : 'breadcrumb-current',
+    text: `🏠 ${roomLabel(activeRoom)}`,
     attrs: { type: 'button' }
   });
-  if (currentPath.length) homeBtn.addEventListener('click', () => goToDepth(0));
+  if (subPath.length) homeBtn.addEventListener('click', () => goToDepth(0));
   els.breadcrumb.appendChild(homeBtn);
 
-  currentPath.forEach((segment, idx) => {
+  subPath.forEach((segment, idx) => {
     els.breadcrumb.appendChild(el('span', { className: 'breadcrumb-sep', text: '›' }));
-    const isLast = idx === currentPath.length - 1;
+    const isLast = idx === subPath.length - 1;
     const segBtn = el('button', {
       className: isLast ? 'breadcrumb-current' : 'breadcrumb-link',
-      text: breadcrumbSegmentLabel(segment, idx),
+      text: segment,
       attrs: { type: 'button' }
     });
     if (!isLast) segBtn.addEventListener('click', () => goToDepth(idx + 1));
@@ -192,12 +244,12 @@ function renderBreadcrumb() {
 }
 
 function goToDepth(depth) {
-  currentPath = currentPath.slice(0, depth);
+  subPath = subPath.slice(0, depth);
   refreshExplorer();
 }
 
 function enterFolder(name) {
-  currentPath.push(name);
+  subPath.push(name);
   refreshExplorer();
 }
 
@@ -233,13 +285,13 @@ async function deleteObjectsRecursive(folderRef) {
 }
 
 async function deleteFolder() {
-  if (currentPath.length === 0) return;
-  const name = currentPath[currentPath.length - 1];
+  if (subPath.length === 0) return;
+  const name = subPath[subPath.length - 1];
   const ok = confirm(`"${name}" 폴더와 그 안의 모든 하위 폴더·파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`);
   if (!ok) return;
   try {
     await deleteObjectsRecursive(currentRef());
-    goToDepth(currentPath.length - 1);
+    goToDepth(subPath.length - 1);
   } catch (err) {
     console.warn('[materials] 폴더 삭제 실패', err);
     showError(`폴더 삭제 실패: ${err.message}`);
@@ -283,7 +335,14 @@ async function refreshExplorer() {
   clearError();
   clearFolderError();
   renderBreadcrumb();
-  els.deleteFolderBtn.hidden = currentPath.length === 0;
+  els.deleteFolderBtn.hidden = subPath.length === 0;
+
+  if (!activeRoom) {
+    els.folderList.innerHTML = '';
+    els.fileList.innerHTML = '';
+    els.emptyMsg.hidden = false;
+    return;
+  }
 
   try {
     const result = await listAll(currentRef());
@@ -291,7 +350,7 @@ async function refreshExplorer() {
     // 하위 폴더 렌더링
     els.folderList.innerHTML = '';
     result.prefixes.forEach((prefixRef) => {
-      const card = el('button', { className: 'folder-card', text: folderLabel(prefixRef.name, currentPath.length), attrs: { type: 'button' } });
+      const card = el('button', { className: 'folder-card', text: `📁 ${prefixRef.name}`, attrs: { type: 'button' } });
       card.addEventListener('click', () => enterFolder(prefixRef.name));
       els.folderList.appendChild(card);
     });
@@ -473,11 +532,12 @@ function initGuideBox() {
 
 // ---------- 초기화 ----------
 
-function init() {
+async function init() {
   initTheme();
   initGuideBox();
   bindControls();
-  refreshExplorer();
+  await loadRooms();
+  await refreshExplorer();
 }
 
 init();
