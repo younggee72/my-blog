@@ -105,6 +105,7 @@ function loadVehicles() {
 
 function saveVehicles(vehicles) {
   localStorage.setItem(VEHICLES_KEY, JSON.stringify(vehicles));
+  pushFleetToCloud();
 }
 
 // ---------- 검사/보험 일정 저장/조회 ----------
@@ -116,6 +117,7 @@ function loadSchedules() {
 
 function saveSchedules(schedules) {
   localStorage.setItem(SCHEDULES_KEY, JSON.stringify(schedules));
+  pushFleetToCloud();
 }
 
 // ---------- 소모품 저장/조회 ----------
@@ -127,6 +129,72 @@ function loadConsumables() {
 
 function saveConsumables(consumables) {
   localStorage.setItem(CONSUMABLES_KEY, JSON.stringify(consumables));
+  pushFleetToCloud();
+}
+
+// ---------- 클라우드 동기화(Firestore) ----------
+// 자료실/현장정산서와 같은 Firebase 프로젝트(jicheon-construction)를 그대로 쓴다.
+// 차량/일정/소모품을 한 문서(fleet/shared)에 통째로 저장해, 어느 기기에서
+// 열어도 같은 목록이 보이게 한다. 로컬(localStorage)은 그대로 즉시 저장하고
+// (오프라인에서도 동작), 클라우드에는 백그라운드로 반영한다.
+
+let fleetFirestoreCtxPromise = null;
+function getFleetFirestoreCtx() {
+  if (!fleetFirestoreCtxPromise) {
+    fleetFirestoreCtxPromise = Promise.all([
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
+    ]).then(([appMod, fsMod]) => {
+      const firebaseConfig = {
+        apiKey: 'AIzaSyAdyXmaN_rgxG_eCFA8jnuzvQabL8thLFk',
+        authDomain: 'jicheon-construction.firebaseapp.com',
+        projectId: 'jicheon-construction',
+        storageBucket: 'jicheon-construction.firebasestorage.app',
+        messagingSenderId: '79554524630',
+        appId: '1:79554524630:web:67a2588607f85984c82077'
+      };
+      const app = appMod.initializeApp(firebaseConfig, 'fleet-cloud');
+      const db = fsMod.getFirestore(app);
+      return { db, fs: fsMod };
+    });
+  }
+  return fleetFirestoreCtxPromise;
+}
+
+// 지금 이 브라우저의 차량/일정/소모품 전체를 클라우드에 올린다(실패해도 화면 동작은 막지 않는다).
+function pushFleetToCloud() {
+  return getFleetFirestoreCtx().then(({ db, fs }) => {
+    const docRef = fs.doc(db, 'fleet', 'shared');
+    return fs.setDoc(docRef, {
+      vehicles: safeParseArray(localStorage.getItem(VEHICLES_KEY), '차량 목록'),
+      schedules: safeParseArray(localStorage.getItem(SCHEDULES_KEY), '검사/보험 일정'),
+      consumables: safeParseArray(localStorage.getItem(CONSUMABLES_KEY), '소모품 항목'),
+      updatedAt: Date.now()
+    });
+  }).catch((err) => {
+    console.warn('[vehicle-fleet] 클라우드 저장 실패', err);
+  });
+}
+
+// 클라우드에 저장된 내용을 받아와 로컬 저장소에 덮어쓴다. 화면이 열릴 때 한 번
+// 호출해 다른 기기에서 저장한 내용을 반영한다. 클라우드에 아직 아무것도
+// 없으면(이 기기가 가장 먼저 동기화를 켠 경우) 아무 것도 덮어쓰지 않는다 —
+// "무엇이 진짜 데이터인지" 기기 간 경합을 피하기 위해, 최초 업로드는
+// "☁️ 클라우드 동기화" 버튼으로 사용자가 직접 하도록 한다.
+function pullFleetFromCloud() {
+  return getFleetFirestoreCtx().then(({ db, fs }) => {
+    const docRef = fs.doc(db, 'fleet', 'shared');
+    return fs.getDoc(docRef);
+  }).then((snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (Array.isArray(data.vehicles)) localStorage.setItem(VEHICLES_KEY, JSON.stringify(data.vehicles));
+    if (Array.isArray(data.schedules)) localStorage.setItem(SCHEDULES_KEY, JSON.stringify(data.schedules));
+    if (Array.isArray(data.consumables)) localStorage.setItem(CONSUMABLES_KEY, JSON.stringify(data.consumables));
+    localStorage.setItem(INIT_FLAG_KEY, 'true');
+  }).catch((err) => {
+    console.warn('[vehicle-fleet] 클라우드 목록 조회 실패', err);
+  });
 }
 
 // ---------- cascade 삭제 ----------

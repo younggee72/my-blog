@@ -1133,10 +1133,33 @@
     initTheme();
     initGuideBox();
 
+    const cloudSyncBtn = document.getElementById('cloud-sync-btn');
+    if (cloudSyncBtn) {
+      cloudSyncBtn.addEventListener('click', () => {
+        cloudSyncBtn.disabled = true;
+        pullFleetFromCloud().then(() => {
+          vehicles = loadVehicles();
+          schedules = loadSchedules();
+          consumables = loadConsumables();
+          renderDashboard();
+          alert('클라우드의 최신 내용을 받아왔습니다.');
+        }).finally(() => {
+          cloudSyncBtn.disabled = false;
+        });
+      });
+    }
+
     showScreen('dashboard');
-    renderDashboard();
-    updateNotifyOffDot();
-    runAutoNotifyCheck();
+    // 화면을 그리기 전에 클라우드(다른 기기에서 저장한 내용)를 먼저 받아와
+    // 로컬 저장소에 반영한다. 실패해도(오프라인 등) 로컬 데이터로 그린다.
+    pullFleetFromCloud().then(() => {
+      vehicles = loadVehicles();
+      schedules = loadSchedules();
+      consumables = loadConsumables();
+      renderDashboard();
+      updateNotifyOffDot();
+      runAutoNotifyCheck();
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

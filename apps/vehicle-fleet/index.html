@@ -22,7 +22,7 @@
   </button>
   <div id="guide-content" class="guide-content">
     <ul>
-      <li>데이터는 <strong>이 브라우저에만 저장</strong>되며(localStorage), 다른 기기와 자동 동기화되지 않습니다. 여러 기기·담당자와 데이터를 공유하려면 <strong>내보내기(JSON)</strong>로 파일을 저장해 전달하고, 받는 쪽은 <strong>가져오기</strong>로 불러오세요.</li>
+      <li>차량·검사·소모품 데이터는 이 브라우저(localStorage)에 저장되는 동시에 회사 공유 저장소(클라우드)에도 자동 동기화되어, 어느 기기에서 열어도 같은 목록이 보입니다. 처음 이 기기에서 연다면 화면이 뜨자마자 클라우드의 최신 내용을 받아옵니다. 필요하면 <strong>☁️ 클라우드 동기화</strong> 버튼으로 수동으로 다시 올리거나 받아올 수 있고, <strong>내보내기(JSON)</strong>로 파일을 따로 백업할 수도 있습니다.</li>
       <li>대시보드 상단 요약 배지는 <strong>검사/보험</strong>과 <strong>소모품</strong>의 임박·경과 건수를 각각 보여줍니다. 임박 기준은 <strong>만기 30일 전</strong>, 그리고 도로 주행 차량은 <strong>잔여 주행거리 1000km 이내</strong>, 포크레인 등 중장비는 <strong>잔여 가동시간 50시간 이내</strong>입니다.</li>
       <li>처음 실행 시 채워져 있는 차량번호·담당자 등은 <strong>예시(더미) 데이터</strong>입니다. 실제 값으로 직접 수정해서 사용하세요.</li>
       <li>포터/덤프/승용차는 <strong>자동차 정기검사</strong> 대상이고, 포크레인(굴착기)처럼 도로 주행이 없는 중장비는 <strong>건설기계 정기검사</strong> 대상이라 항목명이 다르게 표시됩니다. 이런 중장비는 주행거리(km) 대신 <strong>가동시간(시간)</strong> 기준으로 관리합니다.</li>
@@ -40,6 +40,7 @@
 
     <div class="action-bar">
       <button id="add-vehicle-btn" class="btn btn-primary" type="button">+ 차량 등록</button>
+      <button id="cloud-sync-btn" class="btn btn-secondary" type="button">☁️ 클라우드 동기화</button>
       <button id="export-btn" class="btn btn-secondary" type="button">내보내기(JSON)</button>
       <button id="import-btn" class="btn btn-secondary" type="button">가져오기(JSON)</button>
       <input id="import-file" type="file" accept="application/json" hidden>
