@@ -8,235 +8,237 @@
 </head>
 <body>
 <header class="app-header" hidden>
-  <h1 class="app-title">현장정산서</h1>
-  <div class="header-actions">
-    <a class="header-btn" href="../company-portal/index.html">← 포털로 돌아가기</a>
-    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
-  </div>
+<h1 class="app-title">현장정산서</h1>
+<div class="header-actions">
+<a class="header-btn" href="../company-portal/index.html">← 포털로 돌아가기</a>
+<button id="theme-toggle" class="theme-toggle" type="button" aria-label="다크모드 전환">🌙</button>
+</div>
 </header>
 
 <nav class="app-tabs" aria-label="화면 전환" hidden>
-  <a href="index.html" class="app-tab is-active" aria-current="page">정산서 작성</a>
-  <a href="invoices.html" class="app-tab">계산서함</a>
-  <a href="completed.html" class="app-tab">완료정산서</a>
+<a href="index.html" class="app-tab is-active" aria-current="page">정산서 작성</a>
+<a href="invoices.html" class="app-tab">계산서함</a>
+<a href="completed.html" class="app-tab">완료정산서</a>
 </nav>
 
 <main class="container" hidden>
-  <section class="guide-box" aria-label="사용법 안내">
-    <p>
-      <strong>사용법</strong> — ① 공사명과 공급가액을 입력하면 부가세·합계가 자동으로 계산됩니다.
-      ② 아래 3개의 지출 내역 표(외주·자재비 / 노무비 / 기타 협회 및 보증서)에서 "행 추가" 버튼으로 행을 만들고 값을 입력하세요.
-      ③ 하단의 정산 요약 A·B가 입력값에 맞춰 실시간으로 갱신됩니다.
-      ④ "엑셀로 내보내기" 버튼을 누르면 화면 내용을 .xlsx 파일로 저장할 수 있습니다.
-      ⑤ 세금계산서 등에서 뽑아낸 데이터를 정해진 형식의 JSON 파일로 갖고 있다면 "데이터 가져오기" 버튼으로, 여러 파일을 모아둔 폴더가 있다면 "데이터 폴더 연결"로 한 번에 목록을 보고 가져올 수 있습니다.
-      입력한 값은 이 브라우저에 자동 저장되는 동시에, 공사명이 채워지면 회사 공유 저장소(클라우드)에도 함께 저장됩니다. 그래서 비밀번호로 들어온 다른 담당자도 같은 정산서를 어느 기기에서든 "저장된 정산서 불러오기"로 열어볼 수 있습니다. 이 비밀번호는 완전한 보안 장치가 아닌 클라이언트 수준의 가림막이라는 점을 참고해주세요.
-    </p>
-  </section>
+<section class="guide-box" aria-label="사용법 안내">
+<p>
+<strong>사용법</strong> — ① 공사명과 공급가액을 입력하면 부가세·합계가 자동으로 계산됩니다.
+② 아래 3개의 지출 내역 표(외주·자재비 / 노무비 / 기타 협회 및 보증서)에서 "행 추가" 버튼으로 행을 만들고 값을 입력하세요.
+③ 하단의 정산 요약 A·B가 입력값에 맞춰 실시간으로 갱신됩니다.
+④ "엑셀로 내보내기" 버튼을 누르면 화면 내용을 .xlsx 파일로 저장할 수 있습니다.
+⑤ 세금계산서 등에서 뽑아낸 데이터를 정해진 형식의 JSON 파일로 갖고 있다면 "데이터 가져오기" 버튼으로, 여러 파일을 모아둔 폴더가 있다면 "데이터 폴더 연결"로 한 번에 목록을 보고 가져올 수 있습니다.
+⑥ 노무비는 "노무비 대장 엑셀 불러오기" 버튼으로 노무비 대장(.xls/.xlsx)을 고르면 인부별 노무비 총액·공제액이 자동으로 채워집니다(미리보기에서 시트·발행일을 확인한 뒤 채우기).
+입력한 값은 이 브라우저에 자동 저장되는 동시에, 공사명이 채워지면 회사 공유 저장소(클라우드)에도 함께 저장됩니다. 그래서 비밀번호로 들어온 다른 담당자도 같은 정산서를 어느 기기에서든 "저장된 정산서 불러오기"로 열어볼 수 있습니다. 이 비밀번호는 완전한 보안 장치가 아닌 클라이언트 수준의 가림막이라는 점을 참고해주세요.
+</p>
+</section>
 
-  <section class="card" id="project-info">
-    <h2>공사 기본 정보</h2>
-    <div class="form-grid">
-      <label class="field">
-        <span class="field-label">공사명</span>
-        <input type="text" id="project-name" placeholder="예: OOO 신축공사">
-      </label>
-      <label class="field">
-        <span class="field-label">공급가액</span>
-        <input type="text" inputmode="numeric" id="project-supply" data-money="true" placeholder="0">
-      </label>
-      <div class="field derived-field">
-        <span class="field-label">부가세</span>
-        <span id="project-vat" class="derived-value">0</span>
-      </div>
-      <div class="field derived-field">
-        <span class="field-label">합계(계약금액)</span>
-        <span id="project-total" class="derived-value">0</span>
-      </div>
-      <label class="field">
-        <span class="field-label">저장된 정산서 불러오기</span>
-        <select id="project-picker">
-          <option value="">불러올 정산서 선택…</option>
-        </select>
-      </label>
-    </div>
-    <div class="complete-status-row">
-      <span id="complete-status-badge" class="complete-status-badge" hidden>✅ 완료된 정산서입니다</span>
-      <button type="button" id="btn-toggle-complete" class="btn-secondary">✅ 정산 완료 처리</button>
-    </div>
-  </section>
+<section class="card" id="project-info">
+<h2>공사 기본 정보</h2>
+<div class="form-grid">
+<label class="field">
+<span class="field-label">공사명</span>
+<input type="text" id="project-name" placeholder="예: OOO 신축공사">
+</label>
+<label class="field">
+<span class="field-label">공급가액</span>
+<input type="text" inputmode="numeric" id="project-supply" data-money="true" placeholder="0">
+</label>
+<div class="field derived-field">
+<span class="field-label">부가세</span>
+<span id="project-vat" class="derived-value">0</span>
+</div>
+<div class="field derived-field">
+<span class="field-label">합계(계약금액)</span>
+<span id="project-total" class="derived-value">0</span>
+</div>
+<label class="field">
+<span class="field-label">저장된 정산서 불러오기</span>
+<select id="project-picker">
+<option value="">불러올 정산서 선택…</option>
+</select>
+</label>
+</div>
+<div class="complete-status-row">
+<span id="complete-status-badge" class="complete-status-badge" hidden>✅ 완료된 정산서입니다</span>
+<button type="button" id="btn-toggle-complete" class="btn-secondary">✅ 정산 완료 처리</button>
+</div>
+</section>
 
-  <section class="card" id="table-subcontract">
-    <h2>1. 외주·자재비</h2>
-    <p class="scroll-hint">좌우로 스크롤하세요 →</p>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>순번</th>
-            <th>공종</th>
-            <th>발행일</th>
-            <th>거래처</th>
-            <th>사업자등록번호</th>
-            <th>공급가액</th>
-            <th>부가세</th>
-            <th>합계</th>
-            <th>전자세금계산서</th>
-            <th>결제은행</th>
-            <th>결제일</th>
-            <th>결제금액</th>
-            <th>잔액</th>
-            <th>계좌정보</th>
-            <th>연락처</th>
-            <th>비고</th>
-            <th>삭제</th>
-          </tr>
-        </thead>
-        <tbody id="subcontract-body"></tbody>
-        <tfoot>
-          <tr>
-            <td colspan="5">소계</td>
-            <td id="subcontract-sum-supply" class="sum-cell">0</td>
-            <td id="subcontract-sum-vat" class="sum-cell">0</td>
-            <td id="subcontract-sum-total" class="sum-cell">0</td>
-            <td colspan="8"></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <button type="button" class="btn-add" data-add-row="subcontract">+ 행 추가</button>
-  </section>
+<section class="card" id="table-subcontract">
+<h2>1. 외주·자재비</h2>
+<p class="scroll-hint">좌우로 스크롤하세요 →</p>
+<div class="table-scroll">
+<table>
+<thead>
+<tr>
+<th>순번</th>
+<th>공종</th>
+<th>발행일</th>
+<th>거래처</th>
+<th>사업자등록번호</th>
+<th>공급가액</th>
+<th>부가세</th>
+<th>합계</th>
+<th>전자세금계산서</th>
+<th>결제은행</th>
+<th>결제일</th>
+<th>결제금액</th>
+<th>잔액</th>
+<th>계좌정보</th>
+<th>연락처</th>
+<th>비고</th>
+<th>삭제</th>
+</tr>
+</thead>
+<tbody id="subcontract-body"></tbody>
+<tfoot>
+<tr>
+<td colspan="5">소계</td>
+<td id="subcontract-sum-supply" class="sum-cell">0</td>
+<td id="subcontract-sum-vat" class="sum-cell">0</td>
+<td id="subcontract-sum-total" class="sum-cell">0</td>
+<td colspan="8"></td>
+</tr>
+</tfoot>
+</table>
+</div>
+<button type="button" class="btn-add" data-add-row="subcontract">+ 행 추가</button>
+</section>
 
-  <section class="card" id="table-labor">
-    <h2>2. 노무비</h2>
-    <p class="scroll-hint">좌우로 스크롤하세요 →</p>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>순번</th>
-            <th>발행일</th>
-            <th>인부명</th>
-            <th>항목</th>
-            <th>공급가액(일당)</th>
-            <th>원천세</th>
-            <th>합계</th>
-            <th>삭제</th>
-          </tr>
-        </thead>
-        <tbody id="labor-body"></tbody>
-        <tfoot>
-          <tr>
-            <td colspan="4">소계</td>
-            <td id="labor-sum-supply" class="sum-cell">0</td>
-            <td id="labor-sum-withholding" class="sum-cell">0</td>
-            <td id="labor-sum-total" class="sum-cell">0</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <button type="button" class="btn-add" data-add-row="labor">+ 행 추가</button>
-  </section>
+<section class="card" id="table-labor">
+<h2>2. 노무비</h2>
+<p class="scroll-hint">좌우로 스크롤하세요 →</p>
+<div class="table-scroll">
+<table>
+<thead>
+<tr>
+<th>순번</th>
+<th>발행일</th>
+<th>인부명</th>
+<th>항목</th>
+<th>공급가액(일당)</th>
+<th>원천세</th>
+<th>합계</th>
+<th>삭제</th>
+</tr>
+</thead>
+<tbody id="labor-body"></tbody>
+<tfoot>
+<tr>
+<td colspan="4">소계</td>
+<td id="labor-sum-supply" class="sum-cell">0</td>
+<td id="labor-sum-withholding" class="sum-cell">0</td>
+<td id="labor-sum-total" class="sum-cell">0</td>
+<td></td>
+</tr>
+</tfoot>
+</table>
+</div>
+<button type="button" class="btn-add" data-add-row="labor">+ 행 추가</button>
+</section>
 
-  <section class="card" id="table-etc">
-    <h2>3. 기타 협회 및 보증서</h2>
-    <p class="scroll-hint">좌우로 스크롤하세요 →</p>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>순번</th>
-            <th>발행일</th>
-            <th>거래처</th>
-            <th>항목</th>
-            <th>공급가액</th>
-            <th>부가세</th>
-            <th>합계</th>
-            <th>삭제</th>
-          </tr>
-        </thead>
-        <tbody id="etc-body"></tbody>
-        <tfoot>
-          <tr>
-            <td colspan="4">소계</td>
-            <td id="etc-sum-supply" class="sum-cell">0</td>
-            <td id="etc-sum-vat" class="sum-cell">0</td>
-            <td id="etc-sum-total" class="sum-cell">0</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <button type="button" class="btn-add" data-add-row="etc">+ 행 추가</button>
-  </section>
+<section class="card" id="table-etc">
+<h2>3. 기타 협회 및 보증서</h2>
+<p class="scroll-hint">좌우로 스크롤하세요 →</p>
+<div class="table-scroll">
+<table>
+<thead>
+<tr>
+<th>순번</th>
+<th>발행일</th>
+<th>거래처</th>
+<th>항목</th>
+<th>공급가액</th>
+<th>부가세</th>
+<th>합계</th>
+<th>삭제</th>
+</tr>
+</thead>
+<tbody id="etc-body"></tbody>
+<tfoot>
+<tr>
+<td colspan="4">소계</td>
+<td id="etc-sum-supply" class="sum-cell">0</td>
+<td id="etc-sum-vat" class="sum-cell">0</td>
+<td id="etc-sum-total" class="sum-cell">0</td>
+<td></td>
+</tr>
+</tfoot>
+</table>
+</div>
+<button type="button" class="btn-add" data-add-row="etc">+ 행 추가</button>
+</section>
 
-  <section class="card" id="summary-a">
-    <h2>정산 요약 A — 세금계산서 대비 지출 비교</h2>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>구분</th>
-            <th>공급가액</th>
-            <th>부가세</th>
-            <th>합계</th>
-          </tr>
-        </thead>
-        <tbody id="summary-a-body"></tbody>
-      </table>
-    </div>
-  </section>
+<section class="card" id="summary-a">
+<h2>정산 요약 A — 세금계산서 대비 지출 비교</h2>
+<div class="table-scroll">
+<table>
+<thead>
+<tr>
+<th>구분</th>
+<th>공급가액</th>
+<th>부가세</th>
+<th>합계</th>
+</tr>
+</thead>
+<tbody id="summary-a-body"></tbody>
+</table>
+</div>
+</section>
 
-  <section class="card" id="summary-b">
-    <h2>정산 요약 B — 수익 정산표</h2>
-    <div class="table-scroll">
-      <table>
-        <tbody id="summary-b-body"></tbody>
-      </table>
-    </div>
-  </section>
+<section class="card" id="summary-b">
+<h2>정산 요약 B — 수익 정산표</h2>
+<div class="table-scroll">
+<table>
+<tbody id="summary-b-body"></tbody>
+</table>
+</div>
+</section>
 
-  <section class="card" id="account-info">
-    <h2>입금 계좌 정보</h2>
-    <div class="form-grid">
-      <label class="field">
-        <span class="field-label">은행명</span>
-        <input type="text" id="account-bank" placeholder="예: OO은행">
-      </label>
-      <label class="field">
-        <span class="field-label">계좌번호</span>
-        <input type="text" id="account-number" placeholder="예: 000-000000-00-000">
-      </label>
-    </div>
-  </section>
+<section class="card" id="account-info">
+<h2>입금 계좌 정보</h2>
+<div class="form-grid">
+<label class="field">
+<span class="field-label">은행명</span>
+<input type="text" id="account-bank" placeholder="예: OO은행">
+</label>
+<label class="field">
+<span class="field-label">계좌번호</span>
+<input type="text" id="account-number" placeholder="예: 000-000000-00-000">
+</label>
+</div>
+</section>
 
-  <section class="card" id="data-folder">
-    <h2>데이터 폴더 연결</h2>
-    <p class="folder-hint">
-      세금계산서 등에서 뽑아낸 JSON 파일들을 모아둔 폴더를 연결하면, 그 안의 파일 목록에서 골라 바로 가져올 수 있습니다.
-      "폴더 연결"은 이전에 연결했던 폴더를 그대로 이어서 쓰고(크롬/엣지는 권한만 다시 확인하면 됨), "다른 폴더 선택"을 누르면 새 폴더를 고를 수 있습니다.
-    </p>
-    <div class="folder-controls">
-      <button type="button" id="btn-connect-folder" class="btn-secondary">폴더 연결</button>
-      <button type="button" id="btn-change-folder" class="btn-secondary">다른 폴더 선택</button>
-      <button type="button" id="btn-refresh-folder" class="btn-secondary">새로고침</button>
-      <span id="folder-status" class="folder-status">연결된 폴더 없음</span>
-    </div>
-    <input type="file" id="folder-input-fallback" webkitdirectory multiple hidden>
-    <ul id="folder-file-list" class="folder-file-list"></ul>
-  </section>
+<section class="card" id="data-folder">
+<h2>데이터 폴더 연결</h2>
+<p class="folder-hint">
+세금계산서 등에서 뽑아낸 JSON 파일들을 모아둔 폴더를 연결하면, 그 안의 파일 목록에서 골라 바로 가져올 수 있습니다.
+"폴더 연결"은 이전에 연결했던 폴더를 그대로 이어서 쓰고(크롬/엣지는 권한만 다시 확인하면 됨), "다른 폴더 선택"을 누르면 새 폴더를 고를 수 있습니다.
+</p>
+<div class="folder-controls">
+<button type="button" id="btn-connect-folder" class="btn-secondary">폴더 연결</button>
+<button type="button" id="btn-change-folder" class="btn-secondary">다른 폴더 선택</button>
+<button type="button" id="btn-refresh-folder" class="btn-secondary">새로고침</button>
+<span id="folder-status" class="folder-status">연결된 폴더 없음</span>
+</div>
+<input type="file" id="folder-input-fallback" webkitdirectory multiple hidden>
+<ul id="folder-file-list" class="folder-file-list"></ul>
+</section>
 
-  <section class="action-buttons">
-    <button type="button" id="btn-import" class="btn-secondary">데이터 가져오기</button>
-    <input type="file" id="import-file-input" accept="application/json,.json" hidden>
-    <button type="button" id="btn-export" class="btn-primary">엑셀로 내보내기</button>
-    <button type="button" id="btn-reset" class="btn-secondary">초기화</button>
-  </section>
+<section class="action-buttons">
+<button type="button" id="btn-import" class="btn-secondary">데이터 가져오기</button>
+<input type="file" id="import-file-input" accept="application/json,.json" hidden>
+<button type="button" id="btn-export" class="btn-primary">엑셀로 내보내기</button>
+<button type="button" id="btn-reset" class="btn-secondary">초기화</button>
+</section>
 </main>
 
 <script src="auth.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="shared-utils.js?v=10"></script>
 <script src="settlement.js?v=9"></script>
+<script src="labor-import.js?v=1"></script>
 </body>
 </html>
