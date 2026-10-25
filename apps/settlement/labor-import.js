@@ -302,8 +302,8 @@
 
     var thead = el('thead');
     var hr = el('tr');
-    ['순번', '인부명', '항목', '공급가액(노무비 총액)', '원천세(공제)', '합계(차감지급액)'].forEach(function (h, i) {
-      hr.appendChild(el('th', i >= 3 ? { className: 'num' } : null, h));
+    ['순번', '인부명', '항목', '공급가액(노무비 총액)', '원천세(공제)', '합계(차감지급액)', '삭제'].forEach(function (h, i) {
+      hr.appendChild(el('th', i >= 3 && i <= 5 ? { className: 'num' } : null, h));
     });
     thead.appendChild(hr);
     ui.table.appendChild(thead);
@@ -318,6 +318,15 @@
       tr.appendChild(el('td', { className: 'num' }, formatComma(row.supplyAmount)));
       tr.appendChild(el('td', { className: 'num' }, formatComma(row.withholdingTax)));
       tr.appendChild(el('td', { className: 'num' }, formatComma(row.net)));
+      var delTd = el('td');
+      var delBtn = el('button', { type: 'button', className: 'btn-remove-row', 'aria-label': row.workerName + ' 삭제' }, '×');
+      delBtn.addEventListener('click', function () {
+        res.rows.splice(idx, 1);
+        res.removed = (res.removed || 0) + 1;
+        renderPreview();
+      });
+      delTd.appendChild(delBtn);
+      tr.appendChild(delTd);
       tbody.appendChild(tr);
       s += row.supplyAmount; w += row.withholdingTax; t += row.net;
     });
@@ -330,12 +339,17 @@
     fr.appendChild(el('td', { className: 'num' }, formatComma(s)));
     fr.appendChild(el('td', { className: 'num' }, formatComma(w)));
     fr.appendChild(el('td', { className: 'num' }, formatComma(t)));
+    fr.appendChild(el('td'));
     tfoot.appendChild(fr);
     ui.table.appendChild(tfoot);
 
-    ui.date.value = res.period || ui.date.value || todayStr();
+    var opt = ui.sheet.options[ui.sheet.selectedIndex];
+    if (opt) opt.textContent = sheet.name + ' (' + res.rows.length + '명)';
+    if (!ui.date.value) ui.date.value = res.period || todayStr();
+    ui.apply.disabled = res.rows.length === 0;
+    var removedNote = res.removed ? ' (' + res.removed + '명 삭제함 — 되돌리려면 파일을 다시 불러오세요)' : '';
     setMsg('"' + current.fileName + '" · ' + sheet.name + ' 시트에서 ' + res.rows.length +
-      '명을 찾았습니다. 금액을 대장과 한 번 대조한 뒤 "노무비 표에 채우기"를 눌러주세요.' +
+      '명을 채울 예정입니다' + removedNote + '. 잘못 들어온 사람은 오른쪽 × 로 지우고, 금액을 대장과 대조한 뒤 "노무비 표에 채우기"를 눌러주세요.' +
       (res.period ? '' : ' (대장에서 연월을 찾지 못해 발행일을 오늘로 넣었습니다. 필요하면 바꿔주세요.)'));
   }
 
@@ -441,7 +455,7 @@
     injectStyles();
     ui.btn.addEventListener('click', function () { ui.file.click(); });
     ui.file.addEventListener('change', onFileChosen);
-    ui.sheet.addEventListener('change', renderPreview);
+    ui.sheet.addEventListener('change', function () { ui.date.value = ''; renderPreview(); });
     ui.apply.addEventListener('click', applyImport);
     ui.cancel.addEventListener('click', function () { ui.panel.hidden = true; current = null; });
   }
