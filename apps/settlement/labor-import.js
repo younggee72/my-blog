@@ -91,22 +91,72 @@
     return row[spec.col];
   }
 
-  // 대장 제목/기간 칸에서 "2026년 06월" 같은 연월을 찾아 그 달의 말일(YYYY-MM-DD)을 돌려준다.
+  // 대장 제목/기간 칸에서 대장의 연월을 찾아 그 달의 말일(YYYY-MM-DD)을 돌려준다.
+  //
+  // 대장 위쪽에는 "기간 2026-09-01 ~ 2026-09-30" 같은 진짜 기간 말고도
+  // "연금 상한보수 2025.07.01", 생년월일처럼 대장 기간과 상관없는 날짜가 함께 있다.
+  // 그래서 첫 번째로 보이는 날짜를 쓰지 않고,
+  //   1) 이런 "기준일" 성격의 날짜(왼쪽 칸에 상한·보수·기준·적용·생년 등이 적힌 것)는 빼고,
+  //   2) "기간"이라고 적힌 줄(과 그 아래 줄)에 날짜가 있으면 그중 가장 늦은 날짜를,
+  //   3) 없으면 남은 날짜 중 가장 늦은 날짜를 대장 기간으로 본다.
+  var NON_PERIOD_LABEL = /상한|보수|보험료|기준|적용|생년|만나이|요율|개정|시행/;
+
+  function parseDateCandidate(v) {
+    if (v instanceof Date && !isNaN(v)) return { y: v.getFullYear(), m: v.getMonth() + 1 };
+    var s = String(v == null ? '' : v);
+    var m = s.match(/(20\d{2})\s*(?:년|[.\-\/])\s*(\d{1,2})\s*(?:월|[.\-\/]|$|\s)/);
+    if (m) {
+      var mon = Number(m[2]);
+      if (mon >= 1 && mon <= 12) return { y: Number(m[1]), m: mon };
+    }
+    return null;
+  }
+
   function detectPeriod(grid, headerRow, sheetName) {
     var top = Math.min(grid.length, headerRow + 1);
+    var all = [], periodRowCands = [];
+    var periodRows = {};
+
     for (var r = 0; r < top; r++) {
       var row = grid[r] || [];
       for (var c = 0; c < row.length; c++) {
-        var v = row[c];
-        if (v instanceof Date && !isNaN(v)) return lastDayOf(v.getFullYear(), v.getMonth() + 1);
-        var m = String(v == null ? '' : v).match(/(20\d{2})\s*[년.\-\/]\s*(\d{1,2})\s*월?/);
-        if (m) {
-          var mon = Number(m[2]);
-          if (mon >= 1 && mon <= 12) return lastDayOf(Number(m[1]), mon);
-        }
+        if (norm(row[c]).indexOf('기간') !== -1) { periodRows[r] = true; periodRows[r + 1] = true; }
       }
     }
-    return '';
+
+    for (var r2 = 0; r2 < top; r2++) {
+      var row2 = grid[r2] || [];
+      for (var c2 = 0; c2 < row2.length; c2++) {
+        var cand = parseDateCandidate(row2[c2]);
+
+        // "2026" | "년" | "9" | "월" 처럼 칸이 나뉘어 있는 경우
+        if (!cand && /^20\d{2}$/.test(norm(row2[c2]))) {
+          for (var k = c2 + 1; k <= c2 + 4 && k < row2.length; k++) {
+            var mv = norm(row2[k]);
+            if (/^\d{1,2}$/.test(mv) && Number(mv) >= 1 && Number(mv) <= 12) {
+              cand = { y: Number(norm(row2[c2])), m: Number(mv) };
+              break;
+            }
+          }
+        }
+        if (!cand) continue;
+
+        // 왼쪽 몇 칸에 "상한보수" 같은 말이 있으면 대장 기간이 아니다.
+        var label = '';
+        for (var j = Math.max(0, c2 - 4); j <= c2; j++) label += norm(row2[j]);
+        if (NON_PERIOD_LABEL.test(label)) continue;
+
+        cand.key = cand.y * 100 + cand.m;
+        all.push(cand);
+        if (periodRows[r2]) periodRowCands.push(cand);
+      }
+    }
+
+    var pool = periodRowCands.length ? periodRowCands : all;
+    if (!pool.length) return '';
+    var best = pool[0];
+    pool.forEach(function (cd) { if (cd.key > best.key) best = cd; });
+    return lastDayOf(best.y, best.m);
   }
 
   function lastDayOf(y, m) {
