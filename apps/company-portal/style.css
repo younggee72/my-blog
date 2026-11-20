@@ -55,6 +55,7 @@
 }
 
 body {
+  overflow-x: clip;
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
@@ -205,21 +206,205 @@ a {
 }
 
 /* ---------- 공개 랜딩(대외 홍보) 섹션 ---------- */
+/* 히어로: B 시안(미니멀 타이포형). 900px 컨테이너 밖으로 화면 전체 폭을 쓴다. */
 .landing-hero {
-  text-align: center;
-  padding: 2.25rem 1rem 1.5rem;
+  --hero-bg: #F6F5F1;
+  --hero-text: #16181D;
+  --hero-muted: #4A4F58;
+  --hero-accent: #1F5F8B;
+  --hero-chip-border: #C9C5BB;
+  --hero-bgword: #ECEAE4;
+  --hero-cap-bg: #16181D;
+  --hero-cap-text: #FFFFFF;
+  --hero-cap-muted: #B9BEC7;
+  position: relative;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-top: -1rem;
+  background: var(--hero-bg);
+  color: var(--hero-text);
+  font-family: 'IBM Plex Sans KR', var(--font-body);
+  word-break: keep-all;
+  overflow: hidden;
 }
 
-.landing-company-name {
-  margin: 0 0 0.5rem;
-  font-size: 1.9rem;
-  font-weight: 800;
+:root[data-theme='dark'] .landing-hero {
+  --hero-bg: #17181B;
+  --hero-text: #EEEDE9;
+  --hero-muted: #B4B8C0;
+  --hero-accent: #7FB6DC;
+  --hero-chip-border: #3E4148;
+  --hero-bgword: #1F2024;
+  --hero-cap-bg: #0D0E10;
 }
 
-.landing-slogan {
-  margin: 0 0 0.75rem;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .landing-hero {
+    --hero-bg: #17181B;
+    --hero-text: #EEEDE9;
+    --hero-muted: #B4B8C0;
+    --hero-accent: #7FB6DC;
+    --hero-chip-border: #3E4148;
+    --hero-bgword: #1F2024;
+    --hero-cap-bg: #0D0E10;
+  }
+}
+
+.landing-hero-bgword {
+  position: absolute;
+  left: 2.5rem;
+  bottom: -3.5rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(6rem, 18vw, 16rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--hero-bgword);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.landing-hero-inner {
+  position: relative;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 4.5rem) 1.25rem clamp(3rem, 7vw, 5.5rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(2rem, 4vw, 3.5rem);
+}
+
+.landing-hero-copy {
+  flex: 1 1 440px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.landing-hero-eyebrow {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--hero-accent);
+}
+
+.landing-hero-title {
+  margin: 0;
+  font-size: clamp(2.4rem, 5.6vw, 4rem);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.landing-hero-desc {
+  margin: 0;
+  max-width: 35rem;
+  font-size: 1.1rem;
+  line-height: 1.75;
+  color: var(--hero-muted);
+}
+
+.landing-hero-licenses {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.landing-hero-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--hero-muted);
+}
+
+.landing-hero .landing-license-list li {
+  background: transparent;
+  border-color: var(--hero-chip-border);
+  color: var(--hero-text);
+  font-weight: 500;
+}
+
+.landing-hero-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--hero-text);
+  border-bottom: 2px solid currentColor;
+}
+
+.landing-hero-link:hover {
+  color: var(--hero-accent);
+}
+
+.landing-hero-photos {
+  flex: 1 1 480px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: 230px 270px;
+  gap: 1rem;
+}
+
+.landing-hero-photo {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--hero-cap-bg);
+}
+
+.landing-hero-photo--wide {
+  grid-column: span 2;
+}
+
+.landing-hero-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.landing-hero-photo figcaption {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  right: 1rem;
+  width: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 2px;
+  background: var(--hero-cap-bg);
+  color: var(--hero-cap-text);
+}
+
+.landing-hero-photo figcaption span {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.75rem;
+  color: var(--hero-cap-muted);
+}
+
+.landing-hero-photo figcaption strong {
   font-size: 1.05rem;
-  color: var(--color-text-secondary);
+}
+
+@media (max-width: 600px) {
+  .landing-hero-photos {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: 200px;
+  }
+  .landing-hero-photo--wide {
+    grid-column: auto;
+  }
 }
 
 .placeholder-badge {
