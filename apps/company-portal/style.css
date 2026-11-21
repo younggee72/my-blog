@@ -129,53 +129,6 @@ a {
   cursor: pointer;
 }
 
-/* ---------- 사용법 안내 박스 ---------- */
-.guide-box {
-  max-width: var(--max-width);
-  margin: 1rem auto 0;
-  padding: 0 1.25rem;
-}
-
-.guide-toggle {
-  width: 100%;
-  min-height: 44px;
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: 8px 8px 0 0;
-  padding: 0.6rem 1rem;
-  text-align: left;
-  font-size: 0.95rem;
-  cursor: pointer;
-}
-
-.guide-content {
-  background: var(--color-code-bg);
-  border: 1px solid var(--color-border);
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  padding: 0.9rem 1.1rem;
-  font-size: 0.88rem;
-  color: var(--color-text-secondary);
-}
-
-.guide-content ul {
-  margin: 0;
-  padding-left: 1.2rem;
-}
-
-.guide-content li {
-  margin-bottom: 0.4rem;
-}
-
-.guide-box.collapsed .guide-content {
-  display: none;
-}
-
-.guide-box.collapsed .guide-toggle {
-  border-radius: 8px;
-}
-
 .container {
   max-width: var(--max-width);
   margin: 0 auto;
