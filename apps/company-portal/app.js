@@ -15,10 +15,6 @@
   const installGuideOverlay = document.getElementById('install-guide-overlay');
   const installGuideClose = document.getElementById('install-guide-close');
   const installGuideOkBtn = document.getElementById('install-guide-ok-btn');
-  const guideBox = document.getElementById('guide-box');
-  const guideToggle = document.getElementById('guide-toggle');
-  const guideContent = document.getElementById('guide-content');
-  const guideToggleLabel = document.getElementById('guide-toggle-label');
 
   const siteListEl = document.getElementById('site-list');
   const siteEmptyMsgEl = document.getElementById('site-empty-msg');
@@ -544,33 +540,11 @@
     });
   }
 
-  // ---------- 사용법 안내 박스 ----------
-
-  const GUIDE_KEY = 'company-portal-guide-collapsed';
-
-  function setGuideCollapsed(collapsed) {
-    guideBox.classList.toggle('collapsed', collapsed);
-    guideContent.hidden = collapsed;
-    guideToggle.setAttribute('aria-expanded', String(!collapsed));
-    guideToggleLabel.textContent = collapsed ? '사용법 안내 다시 보기' : '사용법 안내 닫기';
-  }
-
-  function initGuideBox() {
-    const collapsed = localStorage.getItem(GUIDE_KEY) === 'true';
-    setGuideCollapsed(collapsed);
-    guideToggle.addEventListener('click', () => {
-      const isCollapsed = guideBox.classList.contains('collapsed');
-      setGuideCollapsed(!isCollapsed);
-      localStorage.setItem(GUIDE_KEY, String(!isCollapsed));
-    });
-  }
-
   // ---------- 초기화 ----------
 
   function init() {
     initTheme();
     initInstallPrompt();
-    initGuideBox();
     initAccessControl();
     populateStageSelect();
     bindStagePrefill();
