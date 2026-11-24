@@ -904,7 +904,10 @@ function findHometaxHeaderRow(grid) {
       });
       return { headerRow: isGroupRow && nextHasSub ? r + 1 : r, nearMiss: nearMiss };
     }
-    if (hasApproval) nearMiss = true;
+    // (review) 단건 전자세금계산서 양식도 위쪽에 "승인번호" 칸이 있으므로,
+    // 같은 줄에 목록 머리글(작성일자/…등록번호)이 함께 있을 때만 nearMiss로 본다
+    // — 아니면 평범한 단건 엑셀마다 "목록처럼 보이지만…" 경고가 뜬다.
+    if (hasApproval && (hasWriteDate || hasBizNo)) nearMiss = true;
   }
   return { headerRow: -1, nearMiss: nearMiss };
 }
@@ -1163,6 +1166,13 @@ function parseListDate(v) {
     return isValidDateParts(p0[0], p0[1], p0[2]) ? s0 : '';
   }
   if (cellIsEmpty(v)) return '';
+  // (review) 날짜 서식이 빠져 엑셀 날짜 일련번호(예: 46222 = 2026-07-19)로만
+  // 들어온 숫자 셀. 2000-01-01(36526)~2035-12-31(49674) 범위만 날짜로 본다.
+  if (typeof v === 'number' && v >= 36526 && v <= 49674) {
+    var dt = new Date(Math.round((v - 25569) * 86400000));
+    var ys = String(dt.getUTCFullYear()), ms = String(dt.getUTCMonth() + 1), ds = String(dt.getUTCDate());
+    return isValidDateParts(ys, ms, ds) ? formatDateMatch([null, ys, ms, ds]) : '';
+  }
   var s = String(v).trim();
   var m = /^(\d{4})[.\-/]\s?(\d{1,2})[.\-/]\s?(\d{1,2})/.exec(s) || /^(\d{4})(\d{2})(\d{2})$/.exec(s);
   if (!m || !isValidDateParts(m[1], m[2], m[3])) return '';
