@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>계산서함 — 현장정산서</title>
 <link rel="stylesheet" href="style.css?v=4">
-<link rel="stylesheet" href="invoices.css?v=2">
+<link rel="stylesheet" href="invoices.css?v=3">
 </head>
 <body>
 <header class="app-header" hidden>
@@ -30,6 +30,7 @@
       ② "확인 필요" 배지가 붙은 항목은 반드시 클릭해서 값을 확인·수정해주세요(자동인식은 완벽하지 않습니다).
       ③ 공사명은 자동으로 채워지지 않으니 직접 입력하세요.
       ④ 같은 공사명끼리 모은 뒤 "이 공사명으로 정산서 생성" 버튼을 누르면 정산서 작성 화면에 협력업체 내역으로 자동 반영됩니다(결제금액은 항상 0에서 시작하며, 실제 지급을 확인하며 직접 입력해야 합니다).
+      ⑤ <strong>홈택스 목록 엑셀로 한꺼번에 불러오기</strong>: 홈택스(www.hometax.go.kr) 로그인 → <strong>조회/발급 → 전자세금계산서 → 목록조회 → 매출 목록조회(또는 매입 목록조회)</strong> → 기간을 고르고 조회 → 목록 위 <strong>"엑셀 내려받기"</strong> 버튼으로 받은 파일을 위 업로드 칸에 그대로 올리면, 목록의 계산서 수십 건이 <strong>한 번에 한 줄씩</strong> 들어옵니다. 같은 승인번호는 다시 올려도 자동으로 건너뜁니다. 매입은 표1 외주·자재비로, 매출은 정산서의 공급가액으로 반영됩니다. 체크박스로 여러 건을 골라 공사명을 한 번에 넣을 수 있습니다. (홈택스 로그인·인증서는 이 화면에서 다루지 않으며, 내려받은 엑셀 파일만 이 브라우저 안에서 읽습니다.) (메뉴 이름은 홈택스 화면에 따라 조금 다를 수 있습니다)
       업로드한 계산서 파일 자체는 이 브라우저에만 저장되지만, "이 공사명으로 정산서 생성"으로 만들어진 정산서는 회사 공유 저장소(클라우드)에도 함께 저장되어 다른 담당자도 어느 기기에서든 열어볼 수 있습니다.
     </p>
   </section>
@@ -39,13 +40,26 @@
     <p class="folder-hint">
       PDF(전자세금계산서), 스캔본·스크린샷 이미지, 또는 엑셀(.xls, .xlsx) 파일을 올리면 자동으로 발행일·거래처·사업자등록번호·공급가액·부가세·합계를 읽어옵니다.
       스캔 이미지나 임베드 텍스트가 없는 PDF는 인식(OCR)에 다소 시간이 걸릴 수 있습니다(처음 사용 시 한글 인식 데이터를 내려받습니다).
+      홈택스 목록조회에서 내려받은 엑셀은 자동으로 알아보고 여러 건을 한 번에 추가합니다.
     </p>
     <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="계산서 파일을 여기로 끌어다 놓거나 클릭해서 선택">
       <p class="dropzone-text">여기로 파일을 끌어다 놓으세요</p>
       <button type="button" id="btn-pick-files" class="btn-primary">파일 선택</button>
       <input type="file" id="file-input" accept=".pdf,image/*,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
     </div>
+    <div class="hometax-options">
+      <label class="field hometax-direction-field">
+        <span class="field-label">홈택스 목록 구분</span>
+        <select id="hometax-direction">
+          <option value="auto">자동 판별</option>
+          <option value="sales">매출</option>
+          <option value="purchase">매입</option>
+        </select>
+      </label>
+      <span class="hometax-options-hint">단건 계산서 파일에는 영향이 없습니다</span>
+    </div>
     <p id="upload-progress" class="upload-progress" aria-live="polite"></p>
+    <div id="hometax-result" class="hometax-result" aria-live="polite"></div>
   </section>
 
   <section class="card" id="data-folder">
@@ -73,15 +87,37 @@
           <option value="">전체</option>
         </select>
       </label>
+      <label class="field filter-field">
+        <span class="field-label">구분</span>
+        <select id="direction-filter">
+          <option value="">전체</option>
+          <option value="purchase">매입</option>
+          <option value="sales">매출</option>
+        </select>
+      </label>
+      <label class="filter-check">
+        <input type="checkbox" id="filter-no-project">
+        <span>공사명 없는 항목만</span>
+      </label>
+    </div>
+    <div class="bulk-bar" aria-label="선택한 항목 일괄 지정">
+      <span id="bulk-count" class="bulk-count">선택 0건</span>
+      <input type="text" id="bulk-project" list="project-suggestions" placeholder="공사명 입력" aria-label="일괄 지정할 공사명">
+      <button type="button" id="btn-bulk-apply" class="btn-primary" disabled>선택한 0건에 적용</button>
+      <button type="button" id="btn-bulk-same-vendor" class="btn-secondary" disabled>같은 거래처 모두 선택</button>
+      <button type="button" id="btn-bulk-clear" class="btn-secondary" disabled>선택 해제</button>
+      <span id="bulk-hint" class="bulk-hint" aria-live="polite"></span>
     </div>
     <p class="scroll-hint">좌우로 스크롤하세요 →</p>
     <div class="table-scroll">
       <table>
         <thead>
           <tr>
+            <th class="select-cell"><label class="select-label"><input type="checkbox" id="select-all-visible" aria-label="보이는 항목 전체 선택"></label></th>
             <th>순번</th>
+            <th>구분</th>
             <th>발행일</th>
-            <th>거래처</th>
+            <th title="매입=공급자, 매출=공급받는자">거래처</th>
             <th>공종</th>
             <th>사업자등록번호</th>
             <th>공급가액</th>
@@ -105,20 +141,28 @@
     <div id="generate-summary" class="generate-summary" hidden>
       <div class="generate-summary-grid">
         <div class="generate-summary-item">
-          <span class="field-label">건수</span>
+          <span class="field-label">매입 건수</span>
           <span id="gen-count" class="derived-value">0</span>
         </div>
         <div class="generate-summary-item">
-          <span class="field-label">공급가액 합계</span>
+          <span class="field-label">매입 공급가액 합계</span>
           <span id="gen-supply" class="derived-value">0</span>
         </div>
         <div class="generate-summary-item">
-          <span class="field-label">부가세 합계</span>
+          <span class="field-label">매입 부가세 합계</span>
           <span id="gen-vat" class="derived-value">0</span>
         </div>
         <div class="generate-summary-item">
-          <span class="field-label">합계</span>
+          <span class="field-label">매입 합계</span>
           <span id="gen-total" class="derived-value">0</span>
+        </div>
+        <div class="generate-summary-item" data-sales-summary hidden>
+          <span class="field-label">매출 건수</span>
+          <span id="gen-sales-count" class="derived-value">0</span>
+        </div>
+        <div class="generate-summary-item" data-sales-summary hidden>
+          <span class="field-label">매출 공급가액 합계</span>
+          <span id="gen-sales-supply" class="derived-value">0</span>
         </div>
       </div>
       <button type="button" id="btn-generate" class="btn-primary">이 공사명으로 정산서 생성</button>
@@ -131,7 +175,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="shared-utils.js?v=10"></script>
-<script src="invoices.js?v=17" type="module"></script>
+<script src="shared-utils.js?v=11"></script>
+<script src="invoices.js?v=18" type="module"></script>
 </body>
 </html>
