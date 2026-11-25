@@ -62,10 +62,31 @@ function createEmptyInvoicesState() {
 function normalizeInvoicesState(parsed) {
   var empty = createEmptyInvoicesState();
   if (!parsed || typeof parsed !== 'object') return empty;
+  var invoices = Array.isArray(parsed.invoices) ? parsed.invoices : empty.invoices;
+  // (v7) 홈택스 목록 기능 이전에 저장된 행에는 direction/approvalNo/blobKey/
+  // sourceRow가 없다 — 모두 "매입, 승인번호 없음, 원본은 id 키"로 채워
+  // 기존 동작과 똑같이 보이게 한다.
+  invoices.forEach(function (r) {
+    if (!r || typeof r !== 'object') return;
+    if (r.direction !== 'sales' && r.direction !== 'purchase') r.direction = 'purchase';
+    if (typeof r.approvalNo !== 'string') r.approvalNo = '';
+    if (r.blobKey === undefined) r.blobKey = null;
+    if (r.sourceRow === undefined) r.sourceRow = null;
+  });
   return {
-    invoices: Array.isArray(parsed.invoices) ? parsed.invoices : empty.invoices,
+    invoices: invoices,
     invoicesNextId: parsed.invoicesNextId || empty.invoicesNextId
   };
+}
+
+function getDirection(row) {
+  return row && row.direction === 'sales' ? 'sales' : 'purchase';
+}
+
+// 홈택스 목록에서 가져온 행인지(재인식 대상이 아님). 셀을 직접 고치면
+// parseMethod가 'manual'로 바뀌므로 승인번호/원본 줄 번호로도 판단한다.
+function isHometaxListRow(row) {
+  return !!row && (row.parseMethod === 'hometax-list' || !!row.approvalNo || row.sourceRow != null);
 }
 
 function loadInvoicesState() {
@@ -661,6 +682,15 @@ function findInvoiceSheetText(workbook) {
 async function extractExcelInvoiceData(file) {
   var workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await file.arrayBuffer());
+
+  // (v7) 홈택스 목록 판별을 단건 인식보다 먼저 한다 — 목록 텍스트에도
+  // "세금계산서/공급자/세액"이 들어 있어 단건으로 잘못 합쳐질 수 있다.
+  var hometax = detectHometaxInWorkbook((workbook.worksheets || []).map(function (ws) {
+    return { name: ws.name, grid: worksheetToGrid(ws) };
+  }), file.name);
+  if (hometax.list) return { hometaxList: hometax.list };
+  if (hometax.nearMiss) reportHometaxNearMiss(file.name);
+
   var text = findInvoiceSheetText(workbook);
 
   // PDF 텍스트 경로와 동일한 원칙: 세금계산서 형식이 아닌 것으로 판별되면
@@ -744,6 +774,14 @@ function findXlsInvoiceSheetText(workbook) {
 // 노출하면 충분하고, xls/xlsx를 구분해 보여줄 필요가 없다).
 async function extractXlsInvoiceData(file) {
   var workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+
+  // (v7) 홈택스 목록 판별 먼저(extractExcelInvoiceData와 같은 이유).
+  var hometax = detectHometaxInWorkbook(((workbook && workbook.SheetNames) || []).map(function (name) {
+    return { name: name, grid: xlsSheetToGrid(workbook.Sheets[name]) };
+  }), file.name);
+  if (hometax.list) return { hometaxList: hometax.list };
+  if (hometax.nearMiss) reportHometaxNearMiss(file.name);
+
   var text = findXlsInvoiceSheetText(workbook);
 
   if (hasSubstantialText(text) && !isTaxInvoiceDocument(text)) return { skip: true };
@@ -751,12 +789,767 @@ async function extractXlsInvoiceData(file) {
   return Object.assign({}, fields, { parseMethod: 'excel', rawText: text });
 }
 
+// ---------------------------------------------------------------------
+// (v7) 홈택스 "전자(세금)계산서 목록조회(매출/매입)" 엑셀 일괄 불러오기
+// (spec-v7-hometax.md 3.2~3.8). 파일 1개 = 계산서 여러 건.
+// ---------------------------------------------------------------------
+
+// 셀 값을 grid용 값으로: 숫자는 숫자로, Date는 Date로 두고(금액/날짜
+// 파싱용), 나머지는 excelCellValueToString과 같은 규칙의 문자열로.
+function gridCellValue(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') return value;
+  if (value instanceof Date) return value;
+  if (typeof value === 'object' && value.formula !== undefined) return gridCellValue(value.result);
+  if (typeof value === 'object' && value.sharedFormula !== undefined) return gridCellValue(value.result);
+  return excelCellValueToString(value);
+}
+
+// ExcelJS 워크시트 → grid[r][c] (0부터, grid 행 번호 + 1 = 엑셀 행 번호).
+// worksheetToText와 달리 빈 칸도 자리를 지켜 열 위치가 밀리지 않는다.
+// 병합 범위의 주인 아닌 칸은 ''(review-v5 규칙)이고, 주인 좌표는
+// grid.masterOf에 기억해 2줄 헤더(세로/가로 병합) 해석에 쓴다.
+function worksheetToGrid(worksheet) {
+  var grid = [];
+  grid.masterOf = {};
+  if (!worksheet) return grid;
+  var rowCount = worksheet.rowCount || 0;
+  var colCount = worksheet.columnCount || 0;
+  for (var r = 1; r <= rowCount; r++) {
+    var row = worksheet.getRow(r);
+    var cells = [];
+    for (var c = 1; c <= colCount; c++) {
+      var cell = row.getCell(c);
+      if (cell.isMerged && cell.master && cell.master !== cell) {
+        grid.masterOf[(r - 1) + ',' + (c - 1)] = [cell.master.row - 1, cell.master.col - 1];
+        cells.push('');
+        continue;
+      }
+      cells.push(gridCellValue(cell.value));
+    }
+    grid.push(cells);
+  }
+  return grid;
+}
+
+// SheetJS 시트 → grid (xlsSheetToText와 같은 !ref 순회 + buildXlsMergeSkipSet).
+function xlsSheetToGrid(sheet) {
+  var grid = [];
+  grid.masterOf = {};
+  var ref = sheet && sheet['!ref'];
+  if (!ref) return grid;
+  var range = XLSX.utils.decode_range(ref);
+  var skip = buildXlsMergeSkipSet(sheet);
+  (sheet['!merges'] || []).forEach(function (m) {
+    for (var mr = m.s.r; mr <= m.e.r; mr++) {
+      for (var mc = m.s.c; mc <= m.e.c; mc++) {
+        if (mr === m.s.r && mc === m.s.c) continue;
+        grid.masterOf[mr + ',' + mc] = [m.s.r, m.s.c];
+      }
+    }
+  });
+  for (var r = 0; r <= range.e.r; r++) {
+    var cells = [];
+    for (var c = 0; c <= range.e.c; c++) {
+      if (r < range.s.r || c < range.s.c || skip[r + ',' + c]) { cells.push(''); continue; }
+      var cell = sheet[XLSX.utils.encode_cell({ r: r, c: c })];
+      cells.push(cell ? gridCellValue(cell.v) : '');
+    }
+    grid.push(cells);
+  }
+  return grid;
+}
+
+function normHeader(s) {
+  if (s === null || s === undefined) return '';
+  if (s instanceof Date) return '';
+  return String(s).replace(/\s+/g, '').replace(/（/g, '(').replace(/）/g, ')');
+}
+
+function cellIsEmpty(v) {
+  return v === '' || v === null || v === undefined || (typeof v === 'string' && !v.trim());
+}
+
+var HOMETAX_HEADER_SCAN_ROWS = 30;
+
+// 위쪽 30행 안에서 "승인번호"가 들어간 칸과 "공급가액"과 정확히 같은 칸이
+// 함께 있는 첫 행을 헤더 행으로 본다. 승인번호만 있고 공급가액이 없는 행을
+// 봤다면 nearMiss로 알린다(5장).
+// 홈택스 화면/엑셀에 따라 승인번호 열이 없을 수도 있어, 공급가액 + 작성일자 +
+// "…등록번호" 열이 함께 있는 행도 헤더 행으로 인정한다(이 경우 중복은
+// 작성일자+상대방 사업자번호+공급가액+세액 조합으로 판단).
+function findHometaxHeaderRow(grid) {
+  var nearMiss = false;
+  var max = Math.min(grid.length, HOMETAX_HEADER_SCAN_ROWS);
+  for (var r = 0; r < max; r++) {
+    var hasApproval = false, hasSupply = false, hasWriteDate = false, hasBizNo = false;
+    (grid[r] || []).forEach(function (v) {
+      var n = normHeader(v);
+      if (n.indexOf('승인번호') !== -1) hasApproval = true;
+      if (n === '공급가액') hasSupply = true;
+      if (n === '작성일자' || n === '작성일') hasWriteDate = true;
+      if (n.indexOf('등록번호') !== -1 && n.indexOf('품목') !== 0) hasBizNo = true;
+    });
+    if (hasSupply && (hasApproval || (hasWriteDate && hasBizNo))) {
+      // 2줄 헤더: 이 줄에 "공급자/공급받는자" 묶음 제목이 있고 바로 아래 줄에
+      // 하위 열 이름(등록번호/상호 …)이 있으면, 아래 줄을 헤더 행으로 쓴다
+      // (세로 병합된 작성일자·공급가액 등은 buildHeaderNames가 위 줄에서 채움).
+      var isGroupRow = (grid[r] || []).some(function (v) {
+        var n = normHeader(v);
+        return n === '공급자' || n === '공급받는자';
+      });
+      var nextHasSub = (grid[r + 1] || []).some(function (v) {
+        var n = normHeader(v);
+        return n === '등록번호' || n === '사업자등록번호' || n === '상호';
+      });
+      return { headerRow: isGroupRow && nextHasSub ? r + 1 : r, nearMiss: nearMiss };
+    }
+    // (review) 단건 전자세금계산서 양식도 위쪽에 "승인번호" 칸이 있으므로,
+    // 같은 줄에 목록 머리글(작성일자/…등록번호)이 함께 있을 때만 nearMiss로 본다
+    // — 아니면 평범한 단건 엑셀마다 "목록처럼 보이지만…" 경고가 뜬다.
+    if (hasApproval && (hasWriteDate || hasBizNo)) nearMiss = true;
+  }
+  return { headerRow: -1, nearMiss: nearMiss };
+}
+
+// 헤더 행의 열 이름(정규화). 세로 병합으로 헤더 칸이 비어 있으면 병합
+// 주인(위쪽 묶음 줄) 칸의 이름을 쓴다(예: "작성일자"가 4~5행 병합).
+function buildHeaderNames(grid, headerRow) {
+  var row = grid[headerRow] || [];
+  var names = [];
+  var originals = [];
+  for (var c = 0; c < row.length; c++) {
+    var v = row[c];
+    if (cellIsEmpty(v)) {
+      var m = grid.masterOf && grid.masterOf[headerRow + ',' + c];
+      if (m && m[1] === c && grid[m[0]]) v = grid[m[0]][m[1]];
+    }
+    names.push(normHeader(v));
+    originals.push(cellIsEmpty(v) ? '' : String(v).replace(/\s+/g, ' ').trim());
+  }
+  return { names: names, originals: originals };
+}
+
+// 헤더 바로 위 줄의 "공급자/공급받는자" 묶음 제목을 열별 그룹으로 기억한다.
+function buildHeaderGroups(grid, headerRow, colCount) {
+  var groups = [];
+  for (var i = 0; i < colCount; i++) groups.push(null);
+  if (headerRow < 1) return groups;
+  var above = grid[headerRow - 1] || [];
+  var r = headerRow - 1;
+  var found = false;
+  for (var c = 0; c < colCount; c++) {
+    var n = normHeader(above[c]);
+    var g = null;
+    if (n.indexOf('공급받는자') !== -1) g = 'buyer';
+    else if (n.indexOf('공급자') !== -1) g = 'supplier';
+    if (!g) continue;
+    found = true;
+    groups[c] = g;
+    var hasMerge = false;
+    for (var c2 = c + 1; c2 < colCount; c2++) {
+      var m = grid.masterOf && grid.masterOf[r + ',' + c2];
+      if (m && m[0] === r && m[1] === c) { groups[c2] = g; hasMerge = true; }
+    }
+    if (!hasMerge) {
+      // 병합 정보가 없으면 다음 제목 칸 전까지를 같은 묶음으로 본다.
+      for (var c3 = c + 1; c3 < colCount; c3++) {
+        if (!cellIsEmpty(above[c3]) || (grid.masterOf && grid.masterOf[r + ',' + c3])) break;
+        groups[c3] = g;
+      }
+    }
+  }
+  return found ? groups : groups.map(function () { return null; });
+}
+
+function colLetter(c) {
+  var s = '';
+  c = c + 1;
+  while (c > 0) {
+    var m = (c - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    c = Math.floor((c - 1) / 26);
+  }
+  return s;
+}
+
+var HOMETAX_PAIRED_FIELDS = [
+  { base: '상호', supplier: 'supplierName', buyer: 'buyerName', label: '상호' },
+  { base: '대표자명', supplier: 'supplierCeo', buyer: 'buyerCeo', label: '대표자명' },
+  { base: '종사업장번호', supplier: 'supplierSubNo', buyer: 'buyerSubNo', label: '종사업장번호' },
+  { base: '주소', supplier: 'supplierAddr', buyer: 'buyerAddr', label: '주소' }
+];
+
+var HOMETAX_SIMPLE_FIELDS = [
+  { key: 'writeDate', cands: ['작성일자', '작성일'] },
+  { key: 'approvalNo', cands: ['승인번호'] },
+  { key: 'issueDate', cands: ['발급일자'] },
+  { key: 'sendDate', cands: ['전송일자'] },
+  { key: 'supplyAmount', cands: ['공급가액'], exactOnly: true },
+  { key: 'vat', cands: ['세액'], exactOnly: true },
+  { key: 'total', cands: ['합계금액', '합계'] },
+  { key: 'category', cands: ['전자세금계산서분류'] },
+  { key: 'kind', cands: ['전자세금계산서종류'] },
+  { key: 'issueType', cands: ['발급유형'] },
+  { key: 'note', cands: ['비고'], exactOnly: true },
+  { key: 'receiptType', cands: ['영수/청구구분', '영수청구구분'] },
+  { key: 'itemName', cands: ['품목명'], item: true },
+  { key: 'itemSpec', cands: ['품목규격'], item: true },
+  { key: 'itemQty', cands: ['품목수량'], item: true },
+  { key: 'itemPrice', cands: ['품목단가'], item: true },
+  { key: 'itemSupply', cands: ['품목공급가액'], item: true },
+  { key: 'itemVat', cands: ['품목세액'], item: true },
+  { key: 'itemNote', cands: ['품목비고'], item: true },
+  { key: 'itemDate', cands: ['품목일자'], item: true }
+];
+
+// 이름으로 열 찾기: 정확히 같은 열 먼저, 없으면 포함하는 열(exactOnly 제외).
+// 품목 필드는 "품목" 접두사 열만, 그 외 필드는 "품목" 접두사 열을 보지 않는다.
+function findHeaderCol(names, cands, opts) {
+  opts = opts || {};
+  var used = opts.used || {};
+  function eligible(c) {
+    var n = names[c];
+    if (!n || used[c]) return false;
+    var isItem = n.indexOf('품목') === 0;
+    return opts.item ? isItem : !isItem;
+  }
+  for (var i = 0; i < cands.length; i++) {
+    for (var c = 0; c < names.length; c++) {
+      if (eligible(c) && names[c] === cands[i]) return c;
+    }
+  }
+  if (opts.exactOnly) return -1;
+  for (var j = 0; j < cands.length; j++) {
+    for (var c2 = 0; c2 < names.length; c2++) {
+      if (eligible(c2) && names[c2].indexOf(cands[j]) !== -1) return c2;
+    }
+  }
+  return -1;
+}
+
+function mapHometaxColumns(names, groups) {
+  var cols = {};
+  var guessed = [];
+  var guessedVendorCols = false;
+  var used = {};
+
+  HOMETAX_SIMPLE_FIELDS.forEach(function (f) {
+    var c = findHeaderCol(names, f.cands, { exactOnly: f.exactOnly, item: f.item });
+    if (c !== -1) cols[f.key] = c;
+  });
+
+  // 사업자등록번호: 접두사가 붙은 이름 먼저
+  var s = findHeaderCol(names, ['공급자사업자등록번호', '공급자등록번호']);
+  var b = findHeaderCol(names, ['공급받는자사업자등록번호', '공급받는자등록번호']);
+  if (s === -1 || b === -1) {
+    // 그냥 "등록번호"/"사업자등록번호"가 두 번 나오는 경우
+    var plain = [];
+    names.forEach(function (n, c) {
+      if (n === '등록번호' || n === '사업자등록번호') plain.push(c);
+    });
+    var bySupplierGroup = plain.filter(function (c) { return groups[c] === 'supplier'; });
+    var byBuyerGroup = plain.filter(function (c) { return groups[c] === 'buyer'; });
+    if (s === -1 && bySupplierGroup.length) s = bySupplierGroup[0];
+    if (b === -1 && byBuyerGroup.length) b = byBuyerGroup[0];
+    var rest = plain.filter(function (c) { return c !== s && c !== b; });
+    if ((s === -1 || b === -1) && rest.length) {
+      if (s === -1 && b === -1) {
+        if (rest.length >= 2) { s = rest[0]; b = rest[1]; }
+      } else if (s === -1) {
+        s = rest[0];
+      } else {
+        b = rest[0];
+      }
+      if (s !== -1 && b !== -1) {
+        guessed.push('공급자/공급받는자 열을 순서로 추정했습니다(첫 번째 등록번호 = 공급자, 두 번째 = 공급받는자). 거래처가 맞는지 확인해주세요.');
+        guessedVendorCols = true;
+      }
+    }
+  }
+  if (s !== -1) { cols.supplierBizNo = s; used[s] = true; }
+  if (b !== -1) { cols.buyerBizNo = b; used[b] = true; }
+  // 상대방 한 세트만 있는 목록(예: 매출 목록조회 화면의 "공급받는자등록번호
+  // (종사업장 번호)", 상호, 대표자명 …)
+  var singleSide = (s !== -1 && b === -1) ? 'supplier' : ((b !== -1 && s === -1) ? 'buyer' : null);
+
+  HOMETAX_PAIRED_FIELDS.forEach(function (f) {
+    // 1) 이름에 접두사가 있는 경우
+    var sc = findHeaderCol(names, ['공급자' + f.base]);
+    var bc = findHeaderCol(names, ['공급받는자' + f.base]);
+    function isBase(c) {
+      var n = names[c];
+      return !!n && (n === f.base || (n.indexOf(f.base) === 0 && n.indexOf('공급') === -1));
+    }
+    // 2) 위치 규칙: 각 사업자등록번호 열 뒤, 다른 쪽 번호 열을 넘지 않는 첫 열
+    if ((sc === -1 || bc === -1) && s !== -1 && b !== -1) {
+      for (var c = 0; c < names.length; c++) {
+        if (!isBase(c)) continue;
+        if (s < b) {
+          if (sc === -1 && c > s && c < b) sc = c;
+          if (bc === -1 && c > b) bc = c;
+        } else {
+          if (bc === -1 && c > b && c < s) bc = c;
+          if (sc === -1 && c > s) sc = c;
+        }
+      }
+    }
+    // 2-b) 한 세트만 있으면 그 번호 열 뒤의 첫 열(없으면 아무 위치의 첫 열)
+    if (singleSide) {
+      var only = singleSide === 'supplier' ? s : b;
+      var picked = -1, anyCol = -1;
+      for (var c1 = 0; c1 < names.length; c1++) {
+        if (!isBase(c1)) continue;
+        if (anyCol === -1) anyCol = c1;
+        if (picked === -1 && c1 > only) picked = c1;
+      }
+      if (picked === -1) picked = anyCol;
+      if (singleSide === 'supplier' && sc === -1) sc = picked;
+      if (singleSide === 'buyer' && bc === -1) bc = picked;
+    }
+    // 3) 2줄 헤더 그룹 정보
+    if (sc === -1 || bc === -1) {
+      for (var c2 = 0; c2 < names.length; c2++) {
+        if (!isBase(c2)) continue;
+        if (sc === -1 && groups[c2] === 'supplier') sc = c2;
+        if (bc === -1 && groups[c2] === 'buyer') bc = c2;
+      }
+    }
+    if (sc !== -1) cols[f.supplier] = sc;
+    if (bc !== -1) cols[f.buyer] = bc;
+  });
+
+  var missingRequired = [];
+  if (cols.writeDate == null) missingRequired.push('작성일자');
+  if (cols.vat == null) missingRequired.push('세액');
+  if (cols.total == null) missingRequired.push('합계금액');
+  if (!singleSide) {
+    if (cols.supplierBizNo == null) missingRequired.push('공급자 사업자등록번호');
+    if (cols.buyerBizNo == null) missingRequired.push('공급받는자 사업자등록번호');
+  }
+
+  return { cols: cols, missingRequired: missingRequired, guessed: guessed, guessedVendorCols: guessedVendorCols, singleSide: singleSide };
+}
+
+// 헤더 위쪽 제목/조회조건 셀 + 시트 이름으로 매출/매입 판별. 둘 다 있거나
+// 둘 다 없으면 null. 파일 이름은 둘 다 없을 때만 마지막 보조 수단.
+function directionFromText(text) {
+  var s = text.indexOf('매출') !== -1;
+  var p = text.indexOf('매입') !== -1;
+  if (s && !p) return 'sales';
+  if (p && !s) return 'purchase';
+  if (s && p) return 'both';
+  return null;
+}
+
+function detectDirection(grid, headerRowIndex, sheetName, fileName, singleSide) {
+  var parts = [];
+  for (var r = 0; r < headerRowIndex; r++) {
+    (grid[r] || []).forEach(function (v) { if (!cellIsEmpty(v) && !(v instanceof Date)) parts.push(String(v)); });
+  }
+  parts.push(sheetName || '');
+  var d = directionFromText(parts.join(' '));
+  if (d === 'sales' || d === 'purchase') return d;
+  // 상대방 한 세트만 있으면 헤더 이름으로 추정: 공급받는자 열만 → 매출,
+  // 공급자 열만 → 매입.
+  if (singleSide === 'buyer') return 'sales';
+  if (singleSide === 'supplier') return 'purchase';
+  if (d === 'both') return null;
+  var f = directionFromText(String(fileName || ''));
+  return f === 'sales' || f === 'purchase' ? f : null;
+}
+
+function parseListDate(v) {
+  if (v instanceof Date) {
+    var s0 = excelCellValueToString(v);
+    var p0 = s0.split('-');
+    return isValidDateParts(p0[0], p0[1], p0[2]) ? s0 : '';
+  }
+  if (cellIsEmpty(v)) return '';
+  // (review) 날짜 서식이 빠져 엑셀 날짜 일련번호(예: 46222 = 2026-07-19)로만
+  // 들어온 숫자 셀. 2000-01-01(36526)~2035-12-31(49674) 범위만 날짜로 본다.
+  if (typeof v === 'number' && v >= 36526 && v <= 49674) {
+    var dt = new Date(Math.round((v - 25569) * 86400000));
+    var ys = String(dt.getUTCFullYear()), ms = String(dt.getUTCMonth() + 1), ds = String(dt.getUTCDate());
+    return isValidDateParts(ys, ms, ds) ? formatDateMatch([null, ys, ms, ds]) : '';
+  }
+  var s = String(v).trim();
+  var m = /^(\d{4})[.\-/]\s?(\d{1,2})[.\-/]\s?(\d{1,2})/.exec(s) || /^(\d{4})(\d{2})(\d{2})$/.exec(s);
+  if (!m || !isValidDateParts(m[1], m[2], m[3])) return '';
+  return formatDateMatch(m);
+}
+
+// "123-45-67890\n0001"처럼 종사업장 번호가 한 셀에 같이 들어온 경우 앞의
+// 사업자등록번호 10자리만 쓴다.
+function bizNoFromCell(v) {
+  var t = gridValueToText(v);
+  if (!t) return '';
+  var m = /(\d{3})\s*-?\s*(\d{2})\s*-?\s*(\d{5})/.exec(t);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  return formatBizRegNo(t);
+}
+
+function bizDigits(v) {
+  return bizNoFromCell(v).replace(/\D/g, '');
+}
+
+function normApprovalNo(v) {
+  if (cellIsEmpty(v)) return '';
+  return String(v).replace(/[\s-]/g, '');
+}
+
+function gridValueToText(v) {
+  if (v instanceof Date) return excelCellValueToString(v);
+  if (cellIsEmpty(v)) return '';
+  return String(v).trim();
+}
+
+// 시트 하나를 홈택스 목록으로 해석. 목록이 아니면 null, 승인번호만 보이고
+// 공급가액 열이 없으면 { nearMiss: true }.
+function detectHometaxList(grid, sheetName, fileName) {
+  var hdr = findHometaxHeaderRow(grid);
+  if (hdr.headerRow === -1) return hdr.nearMiss ? { nearMiss: true } : null;
+  var headerRow = hdr.headerRow;
+  var colCount = 0;
+  grid.forEach(function (row) { if (row.length > colCount) colCount = row.length; });
+  var header = buildHeaderNames(grid, headerRow);
+  var groups = buildHeaderGroups(grid, headerRow, colCount);
+  var mapping = mapHometaxColumns(header.names, groups);
+  var cols = mapping.cols;
+  if (cols.supplyAmount == null) return { nearMiss: true };
+  if (cols.approvalNo == null && cols.writeDate == null) return { nearMiss: true };
+  var hasApprovalCol = cols.approvalNo != null;
+
+  // 같은 승인번호 여러 줄(품목 여러 개)은 1건으로 묶는다. 승인번호 열이 없으면
+  // 작성일자+사업자번호+공급가액+세액 조합을 같은 계산서의 기준으로 쓴다.
+  var invoices = [];
+  var byNo = {};
+  for (var r = headerRow + 1; r < grid.length; r++) {
+    var row = grid[r] || [];
+    var no, raw = '';
+    if (hasApprovalCol) {
+      raw = row[cols.approvalNo];
+      no = normApprovalNo(raw);
+      if (!no || !/\d/.test(no)) continue; // 합계 줄·빈 줄·안내 문구 줄
+    } else {
+      var d = parseListDate(row[cols.writeDate]);
+      if (!d) continue; // 합계 줄·빈 줄·안내 문구 줄(작성일자가 없음)
+      no = 'K|' + d + '|' + bizDigits(cols.supplierBizNo != null ? row[cols.supplierBizNo] : '') + '|' +
+        bizDigits(cols.buyerBizNo != null ? row[cols.buyerBizNo] : '') + '|' +
+        parseNumber(row[cols.supplyAmount]) + '|' + parseNumber(cols.vat != null ? row[cols.vat] : 0);
+    }
+    if (!byNo[no]) {
+      byNo[no] = { approvalNo: hasApprovalCol ? no : '', approvalRaw: gridValueToText(raw), rows: [] };
+      invoices.push(byNo[no]);
+    }
+    byNo[no].rows.push(r);
+  }
+
+  return {
+    sheetName: sheetName || '',
+    fileName: fileName || '',
+    grid: grid,
+    headerRow: headerRow,
+    headerNames: header.names,
+    headerOriginals: header.originals,
+    groups: groups,
+    cols: cols,
+    missingRequired: mapping.missingRequired,
+    guessed: mapping.guessed,
+    guessedVendorCols: mapping.guessedVendorCols,
+    singleSide: mapping.singleSide,
+    hasApprovalCol: hasApprovalCol,
+    detectedDirection: detectDirection(grid, headerRow, sheetName, fileName, mapping.singleSide),
+    invoices: invoices
+  };
+}
+
+function detectHometaxInWorkbook(sheets, fileName) {
+  var nearMiss = false;
+  for (var i = 0; i < sheets.length; i++) {
+    var res = detectHometaxList(sheets[i].grid, sheets[i].name, fileName);
+    if (res && !res.nearMiss) return { list: res, nearMiss: false };
+    if (res && res.nearMiss) nearMiss = true;
+  }
+  return { list: null, nearMiss: nearMiss };
+}
+
+var HOMETAX_RAWTEXT_MAX = 1000;
+
+// 파싱된 목록을 방향(매출/매입)에 맞춰 계산서함 행 모양(id 제외)으로 만든다.
+function parseHometaxRows(parsed, direction) {
+  var cols = parsed.cols;
+  var grid = parsed.grid;
+  var isSales = direction === 'sales';
+  // 매입 → 공급자, 매출 → 공급받는자. 상대방 한 세트만 있는 목록이면 그 세트를 쓴다.
+  var side = parsed.singleSide || (isSales ? 'buyer' : 'supplier');
+  var nameKey = side === 'buyer' ? 'buyerName' : 'supplierName';
+  var bizKey = side === 'buyer' ? 'buyerBizNo' : 'supplierBizNo';
+  var missing = parsed.missingRequired.slice();
+  var notes = [];
+  if (cols[nameKey] == null) missing.push(side === 'buyer' ? '공급받는자 상호' : '공급자 상호');
+  if (parsed.singleSide && ((parsed.singleSide === 'buyer') !== isSales)) {
+    notes.push('이 목록에는 ' + (parsed.singleSide === 'buyer' ? '공급받는자' : '공급자') + ' 열만 있어, ' + directionLabel(direction) + '로 가져왔지만 거래처는 그 열의 값을 썼습니다. 맞는지 확인해주세요.');
+  }
+
+  function val(rowArr, key) {
+    return cols[key] != null ? rowArr[cols[key]] : '';
+  }
+
+  var out = parsed.invoices.map(function (inv) {
+    var first = grid[inv.rows[0]] || [];
+    var supply = parseNumber(val(first, 'supplyAmount'));
+    var vat = parseNumber(val(first, 'vat'));
+    var total = cols.total != null ? parseNumber(val(first, 'total')) : calcTotal(supply, vat);
+    var review = false;
+
+    var itemNames = [];
+    var itemSupplySum = 0, itemVatSum = 0, hasItemSupply = false;
+    inv.rows.forEach(function (r) {
+      var rowArr = grid[r] || [];
+      var nm = gridValueToText(val(rowArr, 'itemName'));
+      if (nm) itemNames.push(nm);
+      if (cols.itemSupply != null && !cellIsEmpty(rowArr[cols.itemSupply])) {
+        hasItemSupply = true;
+        itemSupplySum += parseNumber(rowArr[cols.itemSupply]);
+        itemVatSum += parseNumber(val(rowArr, 'itemVat'));
+      }
+    });
+    if (supply === 0 && hasItemSupply && itemSupplySum !== 0) {
+      supply = itemSupplySum;
+      vat = itemVatSum;
+      total = calcTotal(supply, vat);
+      review = true;
+    } else if (hasItemSupply && inv.rows.length > 1 && itemSupplySum !== supply) {
+      review = true; // 첫 줄 금액과 품목 합이 다름
+    }
+
+    var issueDate = parseListDate(val(first, 'writeDate'));
+    var vendor = gridValueToText(val(first, nameKey));
+    var bizRegNo = bizNoFromCell(val(first, bizKey));
+    var workText = itemNames.join(', ') || gridValueToText(val(first, 'note'));
+    var workType = workText ? extractWorkType(workText) : '';
+
+    var lines = [];
+    inv.rows.forEach(function (r, idx) {
+      var rowArr = grid[r] || [];
+      if (inv.rows.length > 1) lines.push('[' + (r + 1) + '행]');
+      parsed.headerOriginals.forEach(function (h, c) {
+        if (!h) return;
+        var t = gridValueToText(rowArr[c]);
+        if (idx > 0 && !t) return;
+        lines.push(h + ': ' + t);
+      });
+    });
+    var rawText = lines.join('\n');
+    if (rawText.length > HOMETAX_RAWTEXT_MAX) rawText = rawText.slice(0, HOMETAX_RAWTEXT_MAX);
+
+    if (!issueDate || !vendor || !bizRegNo || !supply) review = true;
+    if (calcTotal(supply, vat) !== total) review = true;
+    if (parsed.guessedVendorCols) review = true;
+    if (missing.length) review = true;
+    if (notes.length) review = true;
+
+    return {
+      fileName: parsed.fileName,
+      issueDate: issueDate,
+      vendor: vendor,
+      workType: workType,
+      bizRegNo: bizRegNo,
+      supplyAmount: supply,
+      vat: vat,
+      total: total,
+      projectName: '',
+      parseMethod: 'hometax-list',
+      needsReview: review,
+      rawText: rawText,
+      linkedProjectRowId: null,
+      direction: isSales ? 'sales' : 'purchase',
+      approvalNo: inv.approvalNo,
+      sourceRow: inv.rows[0] + 1
+    };
+  });
+  return { rows: out, missing: missing, notes: notes };
+}
+
+function knownApprovalNos() {
+  var set = {};
+  state.invoices.forEach(function (r) {
+    if (r.approvalNo) set[normApprovalNo(r.approvalNo)] = true;
+  });
+  return set;
+}
+
+// 자동 판별 실패 시 사용자가 매출/매입을 고를 때까지 메모리에만 둔다(저장 안 함).
+var pendingHometaxImports = {};
+var pendingHometaxSeq = 1;
+
+function getHometaxDirectionChoice() {
+  var el = typeof document !== 'undefined' ? document.getElementById('hometax-direction') : null;
+  var v = el ? el.value : 'auto';
+  return v === 'sales' || v === 'purchase' ? v : 'auto';
+}
+
+function directionLabel(d) {
+  return d === 'sales' ? '매출' : '매입';
+}
+
+function importHometaxList(parsed, blobId, file, sourceInfo) {
+  var fileSource = sourceInfo && sourceInfo.fileSource === 'folder' ? 'folder' : 'blob';
+  var ctx = { parsed: parsed, blobId: fileSource === 'blob' ? blobId : null, fileSource: fileSource, fileName: file ? file.name : parsed.fileName };
+  if (!parsed.invoices.length) {
+    if (ctx.blobId != null) deleteStoredFile(ctx.blobId);
+    showHometaxResult('<p>홈택스 목록 파일 \'' + escapeAttr(ctx.fileName) + '\'로 보이지만 계산서가 0건이라 아무 것도 추가하지 않았습니다.</p>' + hometaxMappingDetailsHtml(parsed));
+    return;
+  }
+  var choice = getHometaxDirectionChoice();
+  var detected = parsed.detectedDirection;
+  var notes = [];
+  if (choice !== 'auto') {
+    if (detected && detected !== choice) {
+      notes.push('파일 제목은 ' + (detected === 'sales' ? '매출로' : '매입으로') + ' 보이지만 선택하신 ' + (choice === 'sales' ? '매출로' : '매입으로') + ' 가져왔습니다.');
+    }
+    commitHometaxImport(ctx, choice, notes);
+    return;
+  }
+  if (detected) {
+    commitHometaxImport(ctx, detected, notes);
+    return;
+  }
+  var pid = 'p' + (pendingHometaxSeq++);
+  pendingHometaxImports[pid] = ctx;
+  showHometaxResult(
+    '<p><strong>\'' + escapeAttr(ctx.fileName) + '\'</strong>: 이 목록이 매출인지 매입인지 알 수 없습니다(계산서 ' + parsed.invoices.length + '건).</p>' +
+    '<div class="hometax-choice">' +
+    '<button type="button" class="btn-primary" data-hometax-pending="' + pid + '" data-hometax-choice="sales">매출로 가져오기</button>' +
+    '<button type="button" class="btn-primary" data-hometax-pending="' + pid + '" data-hometax-choice="purchase">매입으로 가져오기</button>' +
+    '<button type="button" class="btn-secondary" data-hometax-pending="' + pid + '" data-hometax-choice="cancel">취소</button>' +
+    '</div>' + hometaxMappingDetailsHtml(parsed),
+    pid
+  );
+}
+
+function resolvePendingHometax(pid, choice) {
+  var ctx = pendingHometaxImports[pid];
+  if (!ctx) return;
+  delete pendingHometaxImports[pid];
+  var block = document.querySelector('[data-hometax-block="' + pid + '"]');
+  if (block) block.remove();
+  if (choice === 'cancel') {
+    if (ctx.blobId != null) deleteStoredFile(ctx.blobId);
+    showHometaxResult('<p>\'' + escapeAttr(ctx.fileName) + '\' 가져오기를 취소했습니다.</p>');
+    return;
+  }
+  commitHometaxImport(ctx, choice === 'sales' ? 'sales' : 'purchase', []);
+}
+
+function commitHometaxImport(ctx, direction, notes) {
+  var parsed = ctx.parsed;
+  var built = parseHometaxRows(parsed, direction);
+  var known = knownApprovalNos();
+  var added = 0, skipped = 0, overlap = 0;
+
+  function comboKey(r) {
+    return [r.issueDate, String(r.bizRegNo || '').replace(/\D/g, ''), Number(r.supplyAmount) || 0, Number(r.vat) || 0].join('|');
+  }
+  var knownCombos = {};
+  if (!parsed.hasApprovalCol) {
+    state.invoices.forEach(function (e) { if (e.issueDate) knownCombos[comboKey(e)] = true; });
+  }
+
+  built.rows.forEach(function (r) {
+    if (r.approvalNo) {
+      if (known[r.approvalNo]) { skipped++; return; }
+      known[r.approvalNo] = true;
+    } else {
+      // 승인번호 열이 없는 목록: 작성일자+상대방 사업자번호+공급가액+세액 조합으로 중복 판단
+      var ck = comboKey(r);
+      if (knownCombos[ck]) { skipped++; return; }
+      knownCombos[ck] = true;
+    }
+    // 단건 PDF/엑셀로 이미 올린 같은 계산서일 수 있음(승인번호 없음) → 확인 필요만 표시
+    var dup = !!r.approvalNo && state.invoices.some(function (e) {
+      return !e.approvalNo && e.issueDate && e.issueDate === r.issueDate &&
+        e.bizRegNo && e.bizRegNo === r.bizRegNo && Number(e.supplyAmount) === Number(r.supplyAmount);
+    });
+    if (dup) { r.needsReview = true; overlap++; }
+    r.id = state.invoicesNextId++;
+    r.fileSource = ctx.fileSource;
+    r.fileName = ctx.fileName;
+    r.blobKey = ctx.blobId;
+    state.invoices.push(r);
+    added++;
+  });
+
+  if (!added && ctx.blobId != null) deleteStoredFile(ctx.blobId);
+  saveInvoicesState();
+  renderInvoiceTable();
+
+  notes = notes.concat(built.notes || []);
+  if (!parsed.hasApprovalCol) notes.push('승인번호 열이 없는 목록이라 작성일자+사업자등록번호+공급가액+세액이 같은 항목을 중복으로 보았습니다.');
+  var html = '<p><strong>홈택스 ' + directionLabel(direction) + ' 목록 \'' + escapeAttr(ctx.fileName) + '\'</strong>: 새로 추가 ' + added + '건, 중복 건너뜀 ' + skipped + '건</p>';
+  notes.forEach(function (n) { html += '<p class="hometax-warn">' + escapeAttr(n) + '</p>'; });
+  if (overlap) html += '<p class="hometax-warn">단건으로 올린 계산서와 겹칠 수 있는 항목 ' + overlap + '건(확인 필요 표시)</p>';
+  if (built.missing.length) {
+    html += '<p class="hometax-warn">이 목록에서 다음 열을 찾지 못했습니다: ' + escapeAttr(built.missing.join(', ')) + ' — 해당 값은 비어 있으니 직접 입력해주세요.</p>';
+  }
+  parsed.guessed.forEach(function (g) { html += '<p class="hometax-warn">' + escapeAttr(g) + '</p>'; });
+  html += hometaxMappingDetailsHtml(parsed);
+  showHometaxResult(html);
+}
+
+var HOMETAX_MAPPING_LABELS = [
+  ['writeDate', '작성일자'], ['approvalNo', '승인번호'], ['supplierBizNo', '공급자 등록번호'],
+  ['supplierName', '공급자 상호'], ['buyerBizNo', '공급받는자 등록번호'], ['buyerName', '공급받는자 상호'],
+  ['supplyAmount', '공급가액'], ['vat', '세액'], ['total', '합계금액'], ['itemName', '품목명'], ['note', '비고']
+];
+
+function hometaxMappingDetailsHtml(parsed) {
+  var parts = HOMETAX_MAPPING_LABELS.map(function (p) {
+    var c = parsed.cols[p[0]];
+    return p[1] + '=' + (c != null ? colLetter(c) + '열' : '없음');
+  });
+  return '<details class="hometax-details"><summary>찾은 열 보기</summary><p>시트: ' + escapeAttr(parsed.sheetName) +
+    ' / 헤더: ' + (parsed.headerRow + 1) + '행 / ' + escapeAttr(parts.join(', ')) + '</p></details>';
+}
+
+function showHometaxResult(innerHtml, pid) {
+  if (typeof document === 'undefined') return;
+  var box = document.getElementById('hometax-result');
+  if (!box) return;
+  var div = document.createElement('div');
+  div.className = 'hometax-result-block';
+  if (pid) div.setAttribute('data-hometax-block', pid);
+  div.innerHTML = '<div class="hometax-result-body">' + innerHtml + '</div>' +
+    (pid ? '' : '<button type="button" class="btn-row-action hometax-close" data-hometax-close="true" aria-label="닫기">닫기</button>');
+  box.appendChild(div);
+}
+
+function reportHometaxNearMiss(fileName) {
+  showHometaxResult('<p class="hometax-warn">\'' + escapeAttr(fileName) + '\': 홈택스 목록처럼 보이지만 공급가액 열을 찾지 못해 불러오지 못했습니다.</p>');
+}
+
+function bindHometaxResult() {
+  var box = document.getElementById('hometax-result');
+  if (!box) return;
+  box.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.hasAttribute('data-hometax-pending')) {
+      resolvePendingHometax(btn.getAttribute('data-hometax-pending'), btn.getAttribute('data-hometax-choice'));
+    } else if (btn.hasAttribute('data-hometax-close')) {
+      var block = btn.closest('.hometax-result-block');
+      if (block) block.remove();
+    }
+  });
+}
+
 function getExtension(name) {
   var m = /\.([a-zA-Z0-9]+)$/.exec(name || '');
   return m ? m[1].toLowerCase() : '';
 }
 
-async function processOneFile(file, invoiceId) {
+async function processOneFile(file, invoiceId, sourceInfo) {
   var ext = getExtension(file.name);
   var result = null;
   try {
@@ -771,6 +1564,14 @@ async function processOneFile(file, invoiceId) {
     }
   } catch (err) {
     result = null;
+  }
+
+  if (result && result.hometaxList) {
+    // (v7) 홈택스 목록: "인식 중" 임시 행은 목록에서 지우되, 그 id로 저장된
+    // 원본 blob은 지우지 않고 새 행들이 함께 가리키는 blobKey로 재사용한다.
+    state.invoices = state.invoices.filter(function (r) { return String(r.id) !== String(invoiceId); });
+    importHometaxList(result.hometaxList, invoiceId, file, sourceInfo || { fileSource: 'blob' });
+    return;
   }
 
   if (result && (result.skip || result.recognitionFailed)) {
@@ -825,7 +1626,11 @@ function enqueueFile(file, sourceInfo) {
     parseMethod: 'failed',
     needsReview: true,
     rawText: '',
-    linkedProjectRowId: null
+    linkedProjectRowId: null,
+    direction: 'purchase',
+    approvalNo: '',
+    blobKey: null,
+    sourceRow: null
   };
   state.invoices.push(row);
   processingIds[invoiceId] = true;
@@ -838,7 +1643,7 @@ function enqueueFile(file, sourceInfo) {
 
   processingQueue = processingQueue
     .then(function () { return storePromise; })
-    .then(function () { return processOneFile(file, invoiceId); })
+    .then(function () { return processOneFile(file, invoiceId, sourceInfo); })
     .catch(function (err) { console.error(err); })
     .then(function () {
       delete processingIds[invoiceId];
@@ -852,6 +1657,10 @@ function enqueueFile(file, sourceInfo) {
 async function retryRecognition(invoiceId) {
   var row = findInvoice(invoiceId);
   if (!row) return;
+  if (isHometaxListRow(row)) {
+    alert('홈택스 목록에서 가져온 항목은 재인식 대신 목록 엑셀을 다시 올려주세요(이미 있는 승인번호는 자동으로 건너뜁니다).');
+    return;
+  }
   var file = await resolveInvoiceFile(row);
   if (!file) {
     alert('원본 파일을 찾을 수 없어 다시 인식할 수 없습니다. 폴더를 다시 연결하거나 원본을 다시 업로드해주세요.');
@@ -946,6 +1755,31 @@ function deleteStoredFile(id) {
   }).catch(function () { /* 무시 */ });
 }
 
+// (v7) 매출/매입 선택을 기다리던 목록 엑셀은 새로고침하면 메모리에서
+// 사라진다 — 그 blob이 남지 않도록, 화면을 열 때 어떤 행도 가리키지 않는
+// blob을 정리한다(행 id 또는 blobKey로 참조되는 것만 유지).
+function cleanupOrphanBlobs() {
+  return openInvoicesDb().then(function (db) {
+    return new Promise(function (resolve) {
+      var tx = db.transaction(INV_DB_FILES_STORE, 'readwrite');
+      var store = tx.objectStore(INV_DB_FILES_STORE);
+      var req = store.getAllKeys();
+      req.onsuccess = function () {
+        var used = {};
+        state.invoices.forEach(function (r) {
+          used[String(r.id)] = true;
+          if (r.blobKey != null) used[String(r.blobKey)] = true;
+        });
+        (req.result || []).forEach(function (k) {
+          if (!used[String(k)]) store.delete(k);
+        });
+      };
+      tx.oncomplete = function () { resolve(); };
+      tx.onerror = function () { resolve(); };
+    });
+  }).catch(function () { /* 무시 */ });
+}
+
 // ---------------------------------------------------------------------
 // 원본 파일 조회/열기
 // ---------------------------------------------------------------------
@@ -957,7 +1791,8 @@ function supportsFsAccess() {
 
 async function resolveInvoiceFile(row) {
   if (row.fileSource === 'blob') {
-    return getStoredFile(row.id);
+    // (v7) 홈택스 목록 행은 여러 행이 하나의 원본 엑셀(blobKey)을 함께 가리킨다.
+    return getStoredFile(row.blobKey != null ? row.blobKey : row.id);
   }
   if (row.fileSource === 'folder') {
     if (!connectedInvoiceDirHandle) return null;
@@ -997,6 +1832,9 @@ async function viewOriginal(invoiceId) {
     }
     alert('"' + row.fileName + '" 원본을 찾을 수 없습니다(파일 이동/삭제 또는 폴더 연결 해제로 추정됩니다). 인식된 값(발행일/거래처 등)은 그대로 보존되어 있으니, 폴더를 다시 연결하거나 같은 이름의 파일을 다시 업로드해 복구를 시도해주세요.');
     return;
+  }
+  if (row.sourceRow != null) {
+    alert('목록 엑셀의 ' + row.sourceRow + '번째 줄입니다');
   }
   openFileInNewTab(file);
 }
@@ -1208,11 +2046,15 @@ function statusBadgeHtml(row) {
   if (row.needsReview) {
     return '<span class="badge badge-review">확인 필요</span>';
   }
+  if (row.parseMethod === 'hometax-list') {
+    return '<span class="badge-ok">홈택스</span>';
+  }
   return '<span class="badge-ok">완료</span>';
 }
 
 function refreshStatusCell(tr, row) {
-  var td = tr.children[9]; // 순번(0)~공사명(8) 다음 10번째 칸(index 9) = 상태
+  // (v7) 체크박스·구분 열이 늘어 칸 번호 하드코딩 대신 data-col로 찾는다.
+  var td = tr.querySelector('[data-col="status"]');
   if (td) td.innerHTML = statusBadgeHtml(row);
 }
 
@@ -1223,17 +2065,45 @@ function updateUploadProgressText() {
   el.textContent = n > 0 ? (n + '건 인식 중…') : '';
 }
 
-function renderInvoiceTable() {
-  var tbody = document.getElementById('invoice-body');
+// (v7) 체크 상태는 메모리에만 둔다(저장하지 않음).
+var selectedIds = {};
+
+function getVisibleInvoices() {
   var filterSelect = document.getElementById('project-filter');
   var filter = filterSelect ? filterSelect.value : '';
-  var rows = state.invoices.filter(function (r) { return !filter || r.projectName === filter; });
+  var dirSelect = document.getElementById('direction-filter');
+  var dirFilter = dirSelect ? dirSelect.value : '';
+  var noProjectEl = document.getElementById('filter-no-project');
+  var noProjectOnly = !!(noProjectEl && noProjectEl.checked);
+  return state.invoices.filter(function (r) {
+    if (filter && r.projectName !== filter) return false;
+    if (dirFilter && getDirection(r) !== dirFilter) return false;
+    if (noProjectOnly && r.projectName) return false;
+    return true;
+  });
+}
+
+function renderInvoiceTable() {
+  var tbody = document.getElementById('invoice-body');
+  var rows = getVisibleInvoices();
+
+  // 목록에서 사라진 행의 체크 상태는 정리한다.
+  Object.keys(selectedIds).forEach(function (id) {
+    if (!findInvoice(id)) delete selectedIds[id];
+  });
 
   var html = '';
   rows.forEach(function (row, idx) {
+    var dir = getDirection(row);
+    var hideRetry = isHometaxListRow(row);
     html +=
       '<tr data-id="' + row.id + '">' +
+      '<td class="select-cell"><label class="select-label"><input type="checkbox" data-select="true" aria-label="선택"' + (selectedIds[row.id] ? ' checked' : '') + '></label></td>' +
       '<td>' + (idx + 1) + '</td>' +
+      '<td><select data-field="direction" class="dir-select dir-' + dir + '" aria-label="구분">' +
+      '<option value="purchase"' + (dir === 'purchase' ? ' selected' : '') + '>매입</option>' +
+      '<option value="sales"' + (dir === 'sales' ? ' selected' : '') + '>매출</option>' +
+      '</select></td>' +
       '<td><input type="date" data-field="issueDate" value="' + escapeAttr(row.issueDate) + '"></td>' +
       '<td><input type="text" data-field="vendor" value="' + escapeAttr(row.vendor) + '"></td>' +
       '<td><input type="text" data-field="workType" value="' + escapeAttr(row.workType) + '"></td>' +
@@ -1242,22 +2112,130 @@ function renderInvoiceTable() {
       '<td><input type="text" inputmode="numeric" data-money="true" data-field="vat" value="' + formatNumber(row.vat) + '"></td>' +
       '<td><input type="text" inputmode="numeric" data-money="true" data-field="total" value="' + formatNumber(row.total) + '"></td>' +
       '<td><input type="text" list="project-suggestions" data-field="projectName" placeholder="공사명 입력" value="' + escapeAttr(row.projectName) + '"></td>' +
-      '<td>' + statusBadgeHtml(row) + '</td>' +
+      '<td data-col="status">' + statusBadgeHtml(row) + '</td>' +
       '<td><div class="row-actions">' +
       '<button type="button" class="btn-row-action" data-action="view">원본</button>' +
-      '<button type="button" class="btn-row-action" data-action="retry">재인식</button>' +
+      (hideRetry ? '' : '<button type="button" class="btn-row-action" data-action="retry">재인식</button>') +
       '<button type="button" class="btn-row-action" data-action="rawtext">텍스트</button>' +
       '</div></td>' +
       '<td><button type="button" class="btn-row-action" data-action="delete" aria-label="삭제">삭제</button></td>' +
       '</tr>';
   });
 
-  tbody.innerHTML = html || '<tr><td colspan="12" class="folder-empty">업로드된 계산서가 없습니다. 위에서 파일을 올리거나 폴더를 연결해보세요.</td></tr>';
+  tbody.innerHTML = html || '<tr><td colspan="14" class="folder-empty">업로드된 계산서가 없습니다. 위에서 파일을 올리거나 폴더를 연결해보세요.</td></tr>';
 
   renderProjectFilterOptions();
   renderProjectSuggestions();
   renderGenerateSummary();
+  renderBulkBar();
   updateUploadProgressText();
+}
+
+function selectedCount() {
+  return Object.keys(selectedIds).length;
+}
+
+// 일괄 지정 바의 "선택 N건"/버튼 활성화와 머리글 전체 선택 체크 상태 갱신.
+function renderBulkBar() {
+  var n = selectedCount();
+  var countEl = document.getElementById('bulk-count');
+  if (countEl) countEl.textContent = '선택 ' + n + '건';
+  var applyBtn = document.getElementById('btn-bulk-apply');
+  if (applyBtn) {
+    applyBtn.disabled = n === 0;
+    applyBtn.textContent = '선택한 ' + n + '건에 적용';
+  }
+  var sameBtn = document.getElementById('btn-bulk-same-vendor');
+  if (sameBtn) sameBtn.disabled = n === 0;
+  var clearBtn = document.getElementById('btn-bulk-clear');
+  if (clearBtn) clearBtn.disabled = n === 0;
+  var all = document.getElementById('select-all-visible');
+  if (all) {
+    var visible = getVisibleInvoices();
+    var checked = visible.filter(function (r) { return selectedIds[r.id]; }).length;
+    all.checked = visible.length > 0 && checked === visible.length;
+    all.indeterminate = checked > 0 && checked < visible.length;
+  }
+}
+
+// 공사명 셀 수정과 일괄 지정이 함께 쓰는 규칙: 값이 바뀌면 정산서 연결을
+// 풀어준다(needsReview/parseMethod는 건드리지 않음 — 공사명은 검수와 무관).
+function setRowProjectName(row, name) {
+  if (row.projectName !== name && row.linkedProjectRowId) {
+    // 이미 어떤 정산서에 반영된 계산서라도, 공사명을 다른 값으로 바꾸면
+    // 그 연결은 "예전 공사명" 기준이므로 더 이상 유효하지 않다 — 풀어줘야
+    // 새 공사명으로 "정산서 생성"할 때 이 계산서가 반영 대상에 포함된다.
+    row.linkedProjectRowId = null;
+  }
+  row.projectName = name;
+}
+
+// 구분(매입/매출) 변경: 반영 위치가 달라지므로 정산서 연결을 풀어준다.
+function setRowDirection(row, dir) {
+  dir = dir === 'sales' ? 'sales' : 'purchase';
+  if (getDirection(row) === dir) return false;
+  row.direction = dir;
+  if (row.linkedProjectRowId) row.linkedProjectRowId = null;
+  return true;
+}
+
+function vendorKey(row) {
+  var biz = String(row.bizRegNo || '').replace(/\D/g, '');
+  return getDirection(row) + '|' + (biz ? 'b:' + biz : 'n:' + String(row.vendor || '').trim());
+}
+
+function bindBulkBar() {
+  var applyBtn = document.getElementById('btn-bulk-apply');
+  var sameBtn = document.getElementById('btn-bulk-same-vendor');
+  var clearBtn = document.getElementById('btn-bulk-clear');
+  var input = document.getElementById('bulk-project');
+  var all = document.getElementById('select-all-visible');
+  var hint = document.getElementById('bulk-hint');
+
+  if (applyBtn) applyBtn.addEventListener('click', function () {
+    var name = input ? input.value.trim() : '';
+    if (!name) {
+      if (hint) hint.textContent = '공사명을 입력해주세요';
+      if (input) input.focus();
+      return;
+    }
+    if (hint) hint.textContent = '';
+    var n = 0;
+    Object.keys(selectedIds).forEach(function (id) {
+      var row = findInvoice(id);
+      if (row) { setRowProjectName(row, name); n++; }
+    });
+    selectedIds = {};
+    saveInvoicesState();
+    renderInvoiceTable();
+    if (hint) hint.textContent = n + '건에 공사명 "' + name + '"을(를) 넣었습니다.';
+  });
+
+  if (sameBtn) sameBtn.addEventListener('click', function () {
+    var keys = {};
+    Object.keys(selectedIds).forEach(function (id) {
+      var row = findInvoice(id);
+      if (row) keys[vendorKey(row)] = true;
+    });
+    state.invoices.forEach(function (r) {
+      if (keys[vendorKey(r)]) selectedIds[r.id] = true;
+    });
+    renderInvoiceTable();
+  });
+
+  if (clearBtn) clearBtn.addEventListener('click', function () {
+    selectedIds = {};
+    renderInvoiceTable();
+  });
+
+  if (all) all.addEventListener('change', function () {
+    var visible = getVisibleInvoices();
+    visible.forEach(function (r) {
+      if (all.checked) selectedIds[r.id] = true;
+      else delete selectedIds[r.id];
+    });
+    renderInvoiceTable();
+  });
 }
 
 function renderProjectFilterOptions() {
@@ -1299,17 +2277,30 @@ function renderGenerateSummary() {
     summaryEl.hidden = true;
     return;
   }
+  // 구분 필터와 무관하게 공사명 필터만 기준으로 계산한다.
   var rows = state.invoices.filter(function (r) { return r.projectName === filter; });
-  var supply = 0, vat = 0, total = 0;
+  var supply = 0, vat = 0, total = 0, purchaseCount = 0;
+  var salesCount = 0, salesSupply = 0;
   rows.forEach(function (r) {
+    if (getDirection(r) === 'sales') {
+      salesCount++;
+      salesSupply += Number(r.supplyAmount) || 0;
+      return;
+    }
+    purchaseCount++;
     supply += Number(r.supplyAmount) || 0;
     vat += Number(r.vat) || 0;
     total += Number(r.total) || 0;
   });
-  document.getElementById('gen-count').textContent = String(rows.length);
+  document.getElementById('gen-count').textContent = String(purchaseCount);
   document.getElementById('gen-supply').textContent = formatNumber(supply);
   document.getElementById('gen-vat').textContent = formatNumber(vat);
   document.getElementById('gen-total').textContent = formatNumber(total);
+  var salesCountEl = document.getElementById('gen-sales-count');
+  var salesSupplyEl = document.getElementById('gen-sales-supply');
+  if (salesCountEl) salesCountEl.textContent = String(salesCount);
+  if (salesSupplyEl) salesSupplyEl.textContent = formatNumber(salesSupply);
+  document.querySelectorAll('[data-sales-summary]').forEach(function (el) { el.hidden = salesCount === 0; });
   summaryEl.hidden = false;
 }
 
@@ -1320,7 +2311,36 @@ function renderGenerateSummary() {
 function bindInvoiceTableEvents() {
   var tbody = document.getElementById('invoice-body');
 
+  // (v7) 체크박스 선택과 구분(select) 변경. select는 input 이벤트도 내지만
+  // 안전하게 change도 처리한다(setRowDirection은 같은 값이면 아무 것도 안 함).
+  function handleDirectionOrSelect(e) {
+    var target = e.target;
+    var tr = target.closest('tr[data-id]');
+    if (!tr) return false;
+    if (target.dataset.select === 'true') {
+      if (e.type !== 'change') return true;
+      var id = tr.getAttribute('data-id');
+      if (target.checked) selectedIds[id] = true;
+      else delete selectedIds[id];
+      renderBulkBar();
+      return true;
+    }
+    if (target.dataset.field === 'direction') {
+      var row = findInvoice(tr.getAttribute('data-id'));
+      if (row && setRowDirection(row, target.value)) {
+        target.classList.remove('dir-sales', 'dir-purchase');
+        target.classList.add('dir-' + getDirection(row));
+        saveInvoicesState();
+        renderGenerateSummary();
+      }
+      return true;
+    }
+    return false;
+  }
+  tbody.addEventListener('change', handleDirectionOrSelect);
+
   tbody.addEventListener('input', function (e) {
+    if (handleDirectionOrSelect(e)) return;
     var target = e.target;
     var field = target.dataset.field;
     if (!field) return;
@@ -1329,14 +2349,9 @@ function bindInvoiceTableEvents() {
     var row = findInvoice(tr.getAttribute('data-id'));
     if (!row) return;
 
-    if (field === 'projectName' && row.projectName !== target.value && row.linkedProjectRowId) {
-      // 이미 어떤 정산서에 반영된 계산서라도, 공사명을 다른 값으로 바꾸면
-      // 그 연결은 "예전 공사명" 기준이므로 더 이상 유효하지 않다 — 풀어줘야
-      // 새 공사명으로 "정산서 생성"할 때 이 계산서가 반영 대상에 포함된다.
-      row.linkedProjectRowId = null;
-    }
-
-    if (target.dataset.money === 'true') {
+    if (field === 'projectName') {
+      setRowProjectName(row, target.value);
+    } else if (target.dataset.money === 'true') {
       row[field] = parseNumber(target.value);
     } else if (field === 'bizRegNo') {
       var caret = target.selectionStart;
@@ -1383,8 +2398,15 @@ function bindInvoiceTableEvents() {
       var row = findInvoice(id);
       var ok = confirm('"' + (row ? row.fileName : '이 계산서') + '" 항목을 목록에서 삭제할까요?\n(연결된 폴더의 원본 파일 자체는 삭제되지 않습니다)');
       if (!ok) return;
-      deleteStoredFile(id);
       state.invoices = state.invoices.filter(function (r) { return String(r.id) !== String(id); });
+      delete selectedIds[id];
+      if (row && row.blobKey != null) {
+        // (v7) 같은 목록 엑셀(blobKey)을 가리키는 행이 하나도 남지 않을 때만 원본 삭제
+        var stillUsed = state.invoices.some(function (r) { return r.blobKey != null && String(r.blobKey) === String(row.blobKey); });
+        if (!stillUsed) deleteStoredFile(row.blobKey);
+      } else {
+        deleteStoredFile(row ? row.id : id);
+      }
       saveInvoicesState();
       renderInvoiceTable();
     } else if (action === 'view') {
@@ -1482,6 +2504,7 @@ function generateSettlementForProject(projectName) {
 
   var targetState;
   var invoicesToLink = unlinkedInvoices;
+  var salesSkippedByUser = false;
 
   if (mode === 'merge') {
     targetState = SettlementShared.normalizeState(existing);
@@ -1507,12 +2530,40 @@ function generateSettlementForProject(projectName) {
     }
   }
 
-  invoicesToLink.forEach(function (inv) {
+  // (v7) 매입 → 표1 외주·자재비(기존과 동일), 매출 → projectInfo.supplyAmount에 합산.
+  var purchasesToLink = invoicesToLink.filter(function (r) { return getDirection(r) !== 'sales'; });
+  var salesToLink = invoicesToLink.filter(function (r) { return getDirection(r) === 'sales'; });
+  var salesSupply = 0;
+  salesToLink.forEach(function (r) { salesSupply += parseNumber(r.supplyAmount); });
+  var baseSupply = mode === 'merge' ? (Number(targetState.projectInfo.supplyAmount) || 0) : 0;
+
+  if (mode === 'merge' && salesToLink.length && baseSupply > 0) {
+    // 사용자가 계약 공급가액을 직접 입력해 둔 경우 이중 합산 방지
+    var addOk = confirm(
+      '기존 공급가액 ' + formatNumber(baseSupply) + '원에 매출 계산서 ' + salesToLink.length + '건(공급가액 ' +
+      formatNumber(salesSupply) + '원)을 더해 ' + formatNumber(baseSupply + salesSupply) + '원으로 바꿀까요?\n' +
+      '취소하면 공급가액은 그대로 두고 매출 계산서는 반영하지 않습니다.'
+    );
+    if (!addOk) {
+      salesToLink = [];
+      salesSupply = 0;
+      salesSkippedByUser = true;
+    }
+  }
+
+  purchasesToLink.forEach(function (inv) {
     var newId = targetState.subcontractNextId++;
     var row = makeSubcontractRowFromInvoice(newId, inv);
     targetState.subcontract.push(row);
     inv.linkedProjectRowId = row.id;
   });
+
+  if (salesToLink.length) {
+    // 정산서의 부가세·합계는 settlement.js가 calcVat(supplyAmount)로 다시 계산하므로
+    // 계산서의 세액은 넣지 않는다.
+    targetState.projectInfo.supplyAmount = baseSupply + salesSupply;
+    salesToLink.forEach(function (inv) { inv.linkedProjectRowId = 'supply'; });
+  }
 
   SettlementShared.saveProjectByName(projectName, targetState);
   saveInvoicesState();
@@ -1522,7 +2573,11 @@ function generateSettlementForProject(projectName) {
   var actionLabel = mode === 'merge' ? '병합했습니다' : (mode === 'overwrite' ? '새로 생성했습니다(기존 내용 대체)' : '새로 생성했습니다');
   if (resultEl) {
     resultEl.innerHTML =
-      '"' + escapeAttr(projectName) + '" 정산서에 계산서 ' + invoicesToLink.length + '건을 ' + actionLabel + '.<br>' +
+      (salesToLink.length
+        ? '"' + escapeAttr(projectName) + '" 정산서에 매입 계산서 ' + purchasesToLink.length + '건(표1 외주·자재비)과 매출 계산서 ' +
+          salesToLink.length + '건(공급가액 +' + formatNumber(salesSupply) + '원)을 ' + actionLabel + '.<br>'
+        : '"' + escapeAttr(projectName) + '" 정산서에 계산서 ' + purchasesToLink.length + '건을 ' + actionLabel + '.' +
+          (salesSkippedByUser ? ' 매출 계산서는 공급가액을 그대로 두기로 해 반영하지 않았습니다.' : '') + '<br>') +
       '<a href="index.html">정산서 작성 화면 열기</a> 후 "저장된 정산서 불러오기"에서 "' + escapeAttr(projectName) + '"를 선택하면 확인할 수 있습니다.' +
       '(결제금액은 항상 0에서 시작하니, 실제 지급을 확인하며 직접 입력해주세요.)';
   }
@@ -1564,12 +2619,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
   bindUpload();
   bindInvoiceTableEvents();
+  bindBulkBar();
+  bindHometaxResult();
+  cleanupOrphanBlobs();
   bindFolderButtons();
   bindMoneyFormatting();
   bindDatePickers();
 
   var filterSelect = document.getElementById('project-filter');
   if (filterSelect) filterSelect.addEventListener('change', renderInvoiceTable);
+  var dirFilter = document.getElementById('direction-filter');
+  if (dirFilter) dirFilter.addEventListener('change', renderInvoiceTable);
+  var noProjectFilter = document.getElementById('filter-no-project');
+  if (noProjectFilter) noProjectFilter.addEventListener('change', renderInvoiceTable);
 
   var generateBtn = document.getElementById('btn-generate');
   if (generateBtn) {
