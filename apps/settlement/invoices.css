@@ -301,6 +301,22 @@
   outline-offset: 1px;
 }
 
+.bulk-bar .btn-bulk-delete:not(:disabled) {
+  color: #c62828;
+  border-color: #c62828;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .bulk-bar .btn-bulk-delete:not(:disabled) {
+    color: #ff8a80;
+    border-color: #ff8a80;
+  }
+}
+[data-theme="dark"] .bulk-bar .btn-bulk-delete:not(:disabled) {
+  color: #ff8a80;
+  border-color: #ff8a80;
+}
+
 .bulk-bar button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

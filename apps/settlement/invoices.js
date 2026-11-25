@@ -2149,6 +2149,11 @@ function renderBulkBar() {
   if (sameBtn) sameBtn.disabled = n === 0;
   var clearBtn = document.getElementById('btn-bulk-clear');
   if (clearBtn) clearBtn.disabled = n === 0;
+  var delBtn = document.getElementById('btn-bulk-delete');
+  if (delBtn) {
+    delBtn.disabled = n === 0;
+    delBtn.textContent = '선택한 ' + n + '건 삭제';
+  }
   var all = document.getElementById('select-all-visible');
   if (all) {
     var visible = getVisibleInvoices();
@@ -2182,6 +2187,27 @@ function setRowDirection(row, dir) {
 function vendorKey(row) {
   var biz = String(row.bizRegNo || '').replace(/\D/g, '');
   return getDirection(row) + '|' + (biz ? 'b:' + biz : 'n:' + String(row.vendor || '').trim());
+}
+
+// 목록에서 계산서 행들을 지운다(행 삭제 버튼·선택 삭제 공용).
+// 목록 엑셀처럼 여러 행이 한 원본(blobKey)을 함께 쓰면, 그 원본을 가리키는
+// 행이 하나도 남지 않을 때만 원본을 지운다.
+function removeInvoices(ids) {
+  var drop = {};
+  ids.forEach(function (id) { drop[String(id)] = true; });
+  var removed = state.invoices.filter(function (r) { return drop[String(r.id)]; });
+  state.invoices = state.invoices.filter(function (r) { return !drop[String(r.id)]; });
+  ids.forEach(function (id) { delete selectedIds[id]; });
+  var blobKeys = {};
+  removed.forEach(function (row) {
+    if (row.blobKey != null) blobKeys[String(row.blobKey)] = row.blobKey;
+    else deleteStoredFile(row.id);
+  });
+  Object.keys(blobKeys).forEach(function (k) {
+    var stillUsed = state.invoices.some(function (r) { return r.blobKey != null && String(r.blobKey) === k; });
+    if (!stillUsed) deleteStoredFile(blobKeys[k]);
+  });
+  return removed.length;
 }
 
 function bindBulkBar() {
@@ -2226,6 +2252,19 @@ function bindBulkBar() {
   if (clearBtn) clearBtn.addEventListener('click', function () {
     selectedIds = {};
     renderInvoiceTable();
+  });
+
+  var delBtn = document.getElementById('btn-bulk-delete');
+  if (delBtn) delBtn.addEventListener('click', function () {
+    var ids = Object.keys(selectedIds).filter(function (id) { return findInvoice(id); });
+    if (!ids.length) return;
+    var ok = confirm('선택한 ' + ids.length + '건을 목록에서 삭제할까요?\n(연결된 폴더의 원본 파일 자체는 삭제되지 않습니다)');
+    if (!ok) return;
+    var n = removeInvoices(ids);
+    selectedIds = {};
+    saveInvoicesState();
+    renderInvoiceTable();
+    if (hint) hint.textContent = n + '건을 삭제했습니다.';
   });
 
   if (all) all.addEventListener('change', function () {
@@ -2398,15 +2437,7 @@ function bindInvoiceTableEvents() {
       var row = findInvoice(id);
       var ok = confirm('"' + (row ? row.fileName : '이 계산서') + '" 항목을 목록에서 삭제할까요?\n(연결된 폴더의 원본 파일 자체는 삭제되지 않습니다)');
       if (!ok) return;
-      state.invoices = state.invoices.filter(function (r) { return String(r.id) !== String(id); });
-      delete selectedIds[id];
-      if (row && row.blobKey != null) {
-        // (v7) 같은 목록 엑셀(blobKey)을 가리키는 행이 하나도 남지 않을 때만 원본 삭제
-        var stillUsed = state.invoices.some(function (r) { return r.blobKey != null && String(r.blobKey) === String(row.blobKey); });
-        if (!stillUsed) deleteStoredFile(row.blobKey);
-      } else {
-        deleteStoredFile(row ? row.id : id);
-      }
+      removeInvoices([id]);
       saveInvoicesState();
       renderInvoiceTable();
     } else if (action === 'view') {

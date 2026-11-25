@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>계산서함 — 현장정산서</title>
 <link rel="stylesheet" href="style.css?v=4">
-<link rel="stylesheet" href="invoices.css?v=3">
+<link rel="stylesheet" href="invoices.css?v=4">
 </head>
 <body>
 <header class="app-header" hidden>
@@ -106,6 +106,7 @@
       <button type="button" id="btn-bulk-apply" class="btn-primary" disabled>선택한 0건에 적용</button>
       <button type="button" id="btn-bulk-same-vendor" class="btn-secondary" disabled>같은 거래처 모두 선택</button>
       <button type="button" id="btn-bulk-clear" class="btn-secondary" disabled>선택 해제</button>
+      <button type="button" id="btn-bulk-delete" class="btn-secondary btn-bulk-delete" disabled>선택한 0건 삭제</button>
       <span id="bulk-hint" class="bulk-hint" aria-live="polite"></span>
     </div>
     <p class="scroll-hint">좌우로 스크롤하세요 →</p>
@@ -176,6 +177,6 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="shared-utils.js?v=11"></script>
-<script src="invoices.js?v=18" type="module"></script>
+<script src="invoices.js?v=19" type="module"></script>
 </body>
 </html>
